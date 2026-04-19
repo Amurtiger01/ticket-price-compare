@@ -1,170 +1,170 @@
-# 票价比价平台详细指南
+# Ticket Price Comparison Platform Detailed Guide
 
-## 一、国内机票平台详解
+## 1. Domestic Flight Platforms
 
-### 携程旅行 (Ctrip)
-- **网址**: https://flights.ctrip.com
-- **优势**: 国内最大OTA，航班覆盖最全，退改签服务好
-- **特色功能**: 
-  - 价格日历：可查看前后7天价格趋势
-  - 携程特价机票专区
-  - 携程超级会员折扣
-- **常见优惠条件**:
-  - 新用户首单立减（需注册新账号）
-  - 携程黑钻/钻石会员专属折扣
-  - 银行卡支付满减（需指定银行卡）
-  - 早晚班机特价（通常为6:00前/22:00后航班）
+### Ctrip
+- **URL**: https://flights.ctrip.com
+- **Advantages**: Largest domestic OTA, most comprehensive flight coverage, good refund/change service
+- **Features**:
+  - Price calendar: view price trends for 7 days before/after
+  - Ctrip special deals section
+  - Ctrip premium member discounts
+- **Common Discount Conditions**:
+  - New user first-order discount (requires new account registration)
+  - Ctrip Black Diamond/Diamond member exclusive discounts
+  - Bank card payment discount (requires specific bank card)
+  - Early/late flight specials (typically flights before 6:00 or after 22:00)
 
-### 去哪儿旅行 (Qunar)
-- **网址**: https://flight.qunar.com
-- **优势**: 比价聚合平台，同一航班可对比多个代理商价格
-- **特色功能**:
-  - 价格监控提醒
-  - 特价机票日历
-  - "捡漏"低价机票推荐
-- **常见优惠条件**:
-  - 代理商优惠券（满减券）
-  - 去哪儿新用户礼包
-  - 特价舱位（可能为团队票，退改严格）
-  - 限时闪购（通常限时2小时内）
+### Qunar
+- **URL**: https://flight.qunar.com
+- **Advantages**: Price comparison aggregator, compare multiple agent prices for the same flight
+- **Features**:
+  - Price monitoring alerts
+  - Special deals calendar
+  - "Last-minute" low-price flight recommendations
+- **Common Discount Conditions**:
+  - Agent coupons (discount vouchers)
+  - Qunar new user welcome package
+  - Special fare cabins (may be group tickets, strict refund/change rules)
+  - Flash sales (typically limited to 2 hours)
 
-### 飞猪旅行 (Fliggy)
-- **网址**: https://www.fliggy.com
-- **优势**: 阿里生态，88VIP会员有额外优惠
-- **特色功能**:
-  - 飞猪里程抵扣
-  - 淘宝/支付宝快捷支付
-  - 信用飞（先飞后付）
-- **常见优惠条件**:
-  - 88VIP会员专属价
-  - 支付宝支付随机立减
-  - 新用户专享红包
-  - 里程兑换折扣
+### Fliggy
+- **URL**: https://www.fliggy.com
+- **Advantages**: Alibaba ecosystem, 88VIP members get extra discounts
+- **Features**:
+  - Fliggy mileage offset
+  - Taobao/Alipay quick payment
+  - Credit Fly (fly now, pay later)
+- **Common Discount Conditions**:
+  - 88VIP member exclusive prices
+  - Alipay payment random discount
+  - New user exclusive coupons
+  - Mileage redemption discount
 
-### 同程旅行 (LY.com)
-- **网址**: https://www.ly.com
-- **优势**: 微信小程序便捷入口，有时有独家低价
-- **特色功能**:
-  - 微信一键登录购买
-  - 同程黑鲸会员折扣
-  - 9.9元机票专区（需抢购）
-- **常见优惠条件**:
-  - 微信支付专属优惠
-  - 同程会员等级折扣
-  - 限时秒杀价（数量有限）
+### Tongcheng (LY.com)
+- **URL**: https://www.ly.com
+- **Advantages**: WeChat mini program easy access, sometimes has exclusive low prices
+- **Features**:
+  - WeChat one-click login and purchase
+  - Tongcheng Black Whale member discount
+  - CNY 9.9 flight deals section (limited quantity)
+- **Common Discount Conditions**:
+  - WeChat Pay exclusive discount
+  - Tongcheng member tier discount
+  - Flash sale prices (limited quantity)
 
-### 春秋航空官网
-- **网址**: https://www.ch.com
-- **优势**: 廉航，价格通常最低
-- **特色功能**:
-  - 9元/99元/199元特价票
-  - 春秋绿翼会员折扣
-- **常见优惠条件**:
-  - 特价票不含托运行李（需额外购买）
-  - 无免费餐食
-  - 座位间距较小
-  - 退改手续费高
-  - 特价票通常不可退改
+### Spring Airlines Official Site
+- **URL**: https://www.ch.com
+- **Advantages**: Low-cost carrier, usually the lowest prices
+- **Features**:
+  - CNY 9/99/199 special tickets
+  - Spring Green Wing member discount
+- **Common Discount Conditions**:
+  - Special tickets do not include checked baggage (must purchase separately)
+  - No free meals
+  - Smaller seat pitch
+  - High refund/change fees
+  - Special tickets usually non-refundable and non-changeable
 
-## 二、国际机票平台详解
+## 2. International Flight Platforms
 
-### Skyscanner天巡
-- **网址**: https://www.skyscanner.net
-- **优势**: 全球最大机票比价，覆盖1200+航司和OTA
-- **特色功能**:
-  - "最便宜月份"搜索
-  - "所有地点"探索（输入出发地，找最便宜目的地）
-  - 价格提醒功能
-- **常见优惠条件**:
-  - 特价票通常不可退改
-  - 部分价格来自代理商（退改需联系代理商）
-  - 中转航班价格更低但耗时更长
+### Skyscanner
+- **URL**: https://www.skyscanner.net
+- **Advantages**: World's largest flight comparison, covers 1200+ airlines and OTAs
+- **Features**:
+  - "Cheapest month" search
+  - "Everywhere" exploration (enter departure, find cheapest destination)
+  - Price alert feature
+- **Common Discount Conditions**:
+  - Special tickets usually non-refundable and non-changeable
+  - Some prices from agents (refund/change must contact agent)
+  - Connecting flights are cheaper but take longer
 
 ### Google Flights
-- **网址**: https://www.google.com/travel/flights
-- **优势**: 日历视图可看整月低价，价格预测算法准确
-- **特色功能**:
-  - 价格趋势图（是否建议现在购买）
-  - 日期网格（不同日期价格对比）
-  - 探索目的地功能
-- **常见优惠条件**:
-  - Google不直接售票，需跳转到航司/OTA购买
-  - 价格可能因cookie/登录状态有差异
-  - 部分特价仅在航司官网提供
+- **URL**: https://www.google.com/travel/flights
+- **Advantages**: Calendar view shows monthly low prices, accurate price prediction algorithm
+- **Features**:
+  - Price trend chart (whether to buy now)
+  - Date grid (price comparison across dates)
+  - Explore destinations feature
+- **Common Discount Conditions**:
+  - Google does not sell tickets directly, redirects to airline/OTA
+  - Prices may vary based on cookie/login status
+  - Some deals only available on airline official sites
 
-### Kayak客涯
-- **网址**: https://www.kayak.com
-- **优势**: 价格预测功能出色，"Hacker Fares"可组合不同航司往返
-- **特色功能**:
-  - 价格预测（买/等建议）
-  - Hacker Fares（去程和回程分别选不同航司）
-  - 灵活日期搜索
-- **常见优惠条件**:
-  - Hacker Fares需分别购买两张票
-  - 如需改签，两张票需分别处理
-  - 部分组合可能无联程保障
+### Kayak
+- **URL**: https://www.kayak.com
+- **Advantages**: Excellent price prediction, "Hacker Fares" combine different airlines for round-trip
+- **Features**:
+  - Price forecast (buy/wait recommendation)
+  - Hacker Fares (outbound and return on different airlines)
+  - Flexible date search
+- **Common Discount Conditions**:
+  - Hacker Fares require purchasing two separate tickets
+  - If change needed, each ticket handled separately
+  - Some combinations may lack connection protection
 
 ### Momondo
-- **网址**: https://www.momondo.com
-- **优势**: 常发现其他平台找不到的隐藏低价
-- **特色功能**:
-  - "Flight Insight"显示最佳预订时间
-  - "Ticket Check"验证票价合理性
-- **常见优惠条件**:
-  - 部分低价来自小型旅行社
-  - 退改签需联系出票方
-  - 机票确认可能较慢
+- **URL**: https://www.momondo.com
+- **Advantages**: Often finds hidden low prices not available on other platforms
+- **Features**:
+  - "Flight Insight" shows best booking time
+  - "Ticket Check" validates fare reasonableness
+- **Common Discount Conditions**:
+  - Some low prices from small travel agencies
+  - Refund/change must contact ticket issuer
+  - Ticket confirmation may be slow
 
-## 三、国际航空公司官网优惠条件
+## 3. International Airline Official Site Discount Conditions
 
-### 常见优惠类型
-| 优惠类型 | 说明 | 条件 |
-|----------|------|------|
-| 早鸟优惠 | 提前60/90天预订享折扣 | 需提前预订，不可退改 |
-| 会员专享价 | 航司会员专属折扣 | 需注册会员（免费） |
-| 信用卡优惠 | 特定信用卡支付享折扣 | 需持有指定信用卡 |
-| 学生折扣 | 12-25岁旅客折扣 | 需提供学生证明 |
-| 老年折扣 | 60岁以上旅客折扣 | 需提供年龄证明 |
-| 军人折扣 | 现役/退役军人折扣 | 需提供军人证明 |
-| 团队票 | 10人以上同行折扣 | 需统一出票，不可部分退改 |
-| 代码共享 | 航司联盟内互享价格 | 实际承运可能不同 |
-| 里程兑换 | 常旅客里程兑换机票 | 需有足够里程，改签费用高 |
-| 转机特价 | 经由特定城市中转的特价 | 需接受较长中转时间 |
+### Common Discount Types
+| Discount Type | Description | Conditions |
+|---------------|-------------|------------|
+| Early Bird | Book 60/90 days in advance for discount | Must book in advance, non-refundable/changeable |
+| Member Exclusive | Airline member exclusive discount | Must register as member (free) |
+| Credit Card | Specific credit card payment discount | Must hold designated credit card |
+| Student Discount | Discount for passengers aged 12-25 | Must provide student proof |
+| Senior Discount | Discount for passengers aged 60+ | Must provide age proof |
+| Military Discount | Discount for active/retired military | Must provide military proof |
+| Group Tickets | Discount for 10+ passengers | Must issue tickets together, partial refund not allowed |
+| Codeshare | Alliance partner shared pricing | Actual operating carrier may differ |
+| Mileage Redemption | Frequent flyer miles for tickets | Must have sufficient miles, high change fees |
+| Transit Special | Special fares via specific connecting cities | Must accept longer connection times |
 
-## 四、火车票优惠条件
+## 4. Train Ticket Discount Conditions
 
-### 12306优惠
-| 优惠类型 | 说明 | 条件 |
-|----------|------|------|
-| 学生票 | 普通硬座5折，动车二等座7.5折 | 需在优惠区间内，每年4次 |
-| 儿童票 | 身高1.2-1.5m半价 | 需成人陪同 |
-| 军人优惠 | 现役军人享优先购票 | 需出示军人证件 |
-| 积分兑换 | 10000积分可兑换一次 | 需注册12306会员 |
+### 12306 Discounts
+| Discount Type | Description | Conditions |
+|---------------|-------------|------------|
+| Student Ticket | 50% off regular hard seat, 25% off EMU second class | Must be within discount route, 4 times per year |
+| Child Ticket | Half price for height 1.2-1.5m | Must be accompanied by adult |
+| Military Priority | Active military priority booking | Must show military ID |
+| Points Redemption | 10000 points for one free ticket | Must register as 12306 member |
 
-### 第三方平台附加优惠
-| 平台 | 优惠 | 条件 |
-|------|------|------|
-| 携程 | 抢票加速包 | 付费购买，加速候补成功率 |
-| 去哪儿 | 智能中转推荐 | 可能需要换乘，总时长增加 |
-| 飞猪 | 新用户红包 | 首次购买火车票使用 |
-| 同程 | 微信支付立减 | 使用微信支付时自动抵扣 |
+### Third-Party Platform Additional Discounts
+| Platform | Discount | Conditions |
+|----------|----------|------------|
+| Ctrip | Ticket-grabbing acceleration package | Paid purchase, increases waitlist success rate |
+| Qunar | Smart transfer recommendation | May require transfer, total time increases |
+| Fliggy | New user coupon | First train ticket purchase |
+| Tongcheng | WeChat Pay instant discount | Auto-deducted when using WeChat Pay |
 
-## 五、特价票常见限制条件
+## 5. Common Restrictions on Special Fares
 
-### 机票特价限制
-1. **不可退改**: 大多数特价票不可退票、不可改签
-2. **行李限制**: 廉航特价票通常仅含7kg手提行李，托运需额外付费
-3. **舱位限制**: 特价票通常为最低舱位（如Y舱以下），座位选择受限
-4. **日期限制**: 特价票仅限特定日期/时段使用
-5. **人数限制**: 特价票数量有限，售完即止
-6. **身份限制**: 部分特价仅限新用户/会员
-7. **支付限制**: 部分优惠需指定支付方式
-8. **中转限制**: 国际特价可能需特定城市中转，可能需要过境签证
-9. **退改费用**: 即使可改签，手续费可能接近票面价
-10. **出票时限**: 部分特价票需在预订后24小时内完成支付
+### Flight Special Fare Restrictions
+1. **Non-refundable/Non-changeable**: Most special tickets cannot be refunded or changed
+2. **Baggage Limits**: LCC special tickets usually include only 7kg carry-on, checked baggage costs extra
+3. **Cabin Class**: Special tickets are lowest cabin class (e.g., below Y class), limited seat selection
+4. **Date Restrictions**: Special tickets valid only on specific dates/time slots
+5. **Quantity Limits**: Special tickets are limited, sold out quickly
+6. **Identity Restrictions**: Some deals only for new users/members
+7. **Payment Restrictions**: Some discounts require specific payment methods
+8. **Transit Restrictions**: International specials may require transit via specific cities, may need transit visa
+9. **Change Fees**: Even if changeable, fees may approach ticket face value
+10. **Ticketing Deadline**: Some special tickets must be paid within 24 hours of booking
 
-### 火车票特价限制
-1. **学生票**: 仅限寒暑假期间，需在学生证优惠区间内
-2. **候补购票**: 不保证一定能候补成功
-3. **改签限制**: 开车后不可退票，改签仅限一次
-4. **换乘票**: 换乘时间不足造成的行程问题自行承担
+### Train Special Fare Restrictions
+1. **Student Tickets**: Only during winter/summer break, must be within student certificate discount route
+2. **Waitlist**: No guarantee of waitlist success
+3. **Change Limits**: No refund after departure, only one change allowed
+4. **Transfer Tickets**: Passenger responsible for any issues caused by insufficient transfer time
