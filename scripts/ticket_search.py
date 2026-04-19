@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Ticket Price Search Script v5.2
+Ticket Price Search Script v6.0
 Searches and compares flight and train ticket prices across major platforms.
 Uses web scraping (携程/去哪儿) for real-time flight prices - NO API KEY NEEDED.
 Uses 12306 public API for real-time train availability AND prices.
-Optionally supports Tequila/Amadeus/Skyscanner API for users who already have keys.
+Optionally supports Tequila/Amadeus API for users who already have keys.
 
 Data Sources (no registration required):
   1. 携程/去哪儿 Web Scraping (primary, no API key needed):
@@ -21,11 +21,6 @@ Optional API (for users who already have keys):
      - Note: Registration may no longer be available
   4. Amadeus API (if AMADEUS_CLIENT_ID + AMADEUS_CLIENT_SECRET are set)
      - Note: Self-service registration is NO LONGER available
-  5. Skyscanner API (if SKYSCANNER_PROXY is set, or SKYSCANNER_NO_PROXY=true for overseas IPs)
-     - Uses irrisolto/skyscanner library for direct Skyscanner data
-     - Requires overseas proxy for Chinese IPs (residential proxy recommended)
-     - If you're already on an overseas IP, set SKYSCANNER_NO_PROXY=true instead
-     - Set SKYSCANNER_PROXY env var, e.g., "http://user:pass@host:port"
 
 Usage:
   python ticket_search.py <departure> <arrival> <date> [flight|train|all]
@@ -59,19 +54,10 @@ try:
 except ImportError:
     HAS_AMADEUS_SDK = False
 
-# Try to import Skyscanner library (optional, requires overseas proxy)
-try:
-    from skyscanner_lib import SkyScanner
-    from skyscanner_lib.types import Airport as SkyscannerAirport, CabinClass, SpecialTypes
-    from skyscanner_lib.errors import BannedWithCaptcha as SkyscannerCaptchaError, GenericError as SkyscannerGenericError
-    HAS_SKYSCANNER_LIB = True
-except ImportError:
-    HAS_SKYSCANNER_LIB = False
-
-# SSL context that handles certificate issues (common on Windows with 12306)
-_ssl_ctx = ssl.create_default_context()
-_ssl_ctx.check_hostname = False
-_ssl_ctx.verify_mode = ssl.CERT_NONE
+# SSL context for 12306 only (their certificate has chain issues on some systems)
+_ssl_ctx_12306 = ssl.create_default_context()
+_ssl_ctx_12306.check_hostname = False
+_ssl_ctx_12306.verify_mode = ssl.CERT_NONE
 
 
 # ============================================================
@@ -397,7 +383,7 @@ class CtripScraper:
             req.add_header(k, v)
 
         try:
-            with urllib.request.urlopen(req, timeout=20, context=_ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=20) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
                 return self._parse_html(html, dep_iata, arr_iata)
         except Exception as e:
@@ -607,7 +593,7 @@ class TequilaClient:
         req.add_header("Accept", "application/json")
 
         try:
-            with urllib.request.urlopen(req, timeout=20, context=_ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=20) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return self._parse_response(data)
         except urllib.error.HTTPError as e:
@@ -761,7 +747,7 @@ class AmadeusClient:
         req.add_header("Authorization", f"Bearer {token}")
 
         try:
-            with urllib.request.urlopen(req, timeout=20, context=_ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=20) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return self._parse_http_response(data)
         except urllib.error.HTTPError as e:
@@ -787,7 +773,7 @@ class AmadeusClient:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
 
         try:
-            with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
                 self._token = result["access_token"]
                 self._token_expires = time.time() + result.get("expires_in", 1800) - 60
@@ -884,214 +870,6 @@ class AmadeusClient:
 
 
 # ============================================================
-# Skyscanner API Integration (Optional, requires overseas proxy)
-# ============================================================
-
-class SkyscannerClient:
-    """Skyscanner flight search client using irrisolto/skyscanner library.
-
-    Uses the Skyscanner Android API via PerimeterX bypass.
-    **IMPORTANT**: Requires an overseas proxy for Chinese IPs. Skyscanner's PerimeterX
-    anti-bot system blocks requests from Chinese IP addresses.
-
-    If you're already on an overseas IP (e.g., Japan, US, EU), set SKYSCANNER_NO_PROXY=true
-    to skip the proxy requirement.
-
-    Set SKYSCANNER_PROXY environment variable for Chinese IPs, e.g.:
-      - "http://user:pass@host:port"
-      - "socks5://user:pass@host:port"
-
-    Without a proxy (and without SKYSCANNER_NO_PROXY), this client will be skipped.
-    """
-
-    def __init__(self, proxy=None):
-        self.proxy = proxy or os.environ.get("SKYSCANNER_PROXY", "")
-        # If already on an overseas IP (outside China), no proxy needed
-        self.no_proxy_needed = os.environ.get("SKYSCANNER_NO_PROXY", "").lower() in ("1", "true", "yes")
-
-    @property
-    def is_configured(self):
-        return bool(HAS_SKYSCANNER_LIB and (self.proxy or self.no_proxy_needed))
-
-    def search_flights(self, origin_iata: str, dest_iata: str, date: str, is_international: bool = True) -> list:
-        """Search for flight offers using Skyscanner Android API.
-
-        Args:
-            origin_iata: IATA code (e.g., "PEK", "PVG")
-            dest_iata: IATA code (e.g., "NRT", "LAX")
-            date: Departure date YYYY-MM-DD
-            is_international: Whether route is international (affects locale/market)
-
-        Returns:
-            List of flight offer dicts
-        """
-        if not HAS_SKYSCANNER_LIB:
-            print("[Skyscanner] 库未安装，跳过", file=sys.stderr)
-            return []
-
-        if not self.proxy and not self.no_proxy_needed:
-            print("[Skyscanner] 未配置代理（SKYSCANNER_PROXY），且未设置SKYSCANNER_NO_PROXY，跳过", file=sys.stderr)
-            return []
-
-        try:
-            # Configure locale/market based on route type
-            if is_international:
-                locale = "en-US"
-                currency = "USD"
-                market = "US"
-            else:
-                locale = "zh-CN"
-                currency = "CNY"
-                market = "CN"
-
-            proxy_display = f"{self.proxy[:30]}..." if self.proxy else "无代理（海外IP直连）"
-            print(f"[Skyscanner] 正在初始化客户端（代理: {proxy_display}）...", file=sys.stderr)
-            client = SkyScanner(
-                locale=locale,
-                currency=currency,
-                market=market,
-                proxy=self.proxy,
-                verify=False,
-                max_retries=10,
-                retry_delay=3,
-            )
-
-            # Search for airports by IATA code
-            print(f"[Skyscanner] 正在搜索机场 {origin_iata}...", file=sys.stderr)
-            origin_airports = client.search_airports(origin_iata)
-            if not origin_airports:
-                print(f"[Skyscanner] 未找到出发机场: {origin_iata}", file=sys.stderr)
-                return []
-            origin = origin_airports[0]
-
-            print(f"[Skyscanner] 正在搜索机场 {dest_iata}...", file=sys.stderr)
-            dest_airports = client.search_airports(dest_iata)
-            if not dest_airports:
-                print(f"[Skyscanner] 未找到目的机场: {dest_iata}", file=sys.stderr)
-                return []
-            destination = dest_airports[0]
-
-            # Search flights
-            depart_dt = datetime.strptime(date, "%Y-%m-%d")
-            print(f"[Skyscanner] 正在查询 {origin_iata} → {dest_iata} 航班...", file=sys.stderr)
-            response = client.get_flight_prices(
-                origin=origin,
-                destination=destination,
-                depart_date=depart_dt,
-                cabinClass=CabinClass.ECONOMY,
-                adults=1,
-            )
-
-            return self._parse_response(response, currency)
-
-        except SkyscannerCaptchaError as e:
-            print(f"[Skyscanner] 被反爬拦截（需要更换代理IP）: {e}", file=sys.stderr)
-            return []
-        except SkyscannerGenericError as e:
-            print(f"[Skyscanner] 请求错误: {e}", file=sys.stderr)
-            return []
-        except Exception as e:
-            print(f"[Skyscanner] 查询异常: {e}", file=sys.stderr)
-            return []
-
-    def _parse_response(self, response, currency: str = "USD") -> list:
-        """Parse Skyscanner response into structured flight offers."""
-        offers = []
-        data = response.json
-
-        if not data or "content" not in data:
-            return offers
-
-        # Get itinerary data
-        itineraries = data.get("content", {}).get("itineraries", {}).get("itinerary", {})
-        legs = data.get("content", {}).get("legs", {}).get("leg", {})
-        segments = data.get("content", {}).get("segments", {}).get("segment", {})
-        places = data.get("content", {}).get("places", {}).get("place", {})
-        carriers = data.get("content", {}).get("carriers", {}).get("carrier", {})
-
-        # Currency conversion for display
-        currency_map = {"USD": "$", "CNY": "¥", "EUR": "€", "GBP": "£"}
-        curr_symbol = currency_map.get(currency, currency)
-
-        for itin_id, itin_data in itineraries.items():
-            try:
-                # Price info
-                price_info = itin_data.get("pricingOptions", [{}])
-                if price_info:
-                    price_val = price_info[0].get("price", {}).get("amount", 0)
-                else:
-                    price_val = 0
-
-                    price_val = 0
-
-                # Get leg IDs
-                leg_ids = itin_data.get("legIds", [])
-                if not leg_ids:
-                    continue
-
-                # Build segments from first leg
-                all_segments = []
-                leg_id = leg_ids[0]
-                leg = legs.get(leg_id, {})
-                segment_ids = leg.get("segmentIds", [])
-
-                for seg_id in segment_ids:
-                    seg = segments.get(seg_id, {})
-                    if not seg:
-                        continue
-
-                    dep_place = places.get(seg.get("originPlaceId", ""), {})
-                    arr_place = places.get(seg.get("destinationPlaceId", ""), {})
-                    carrier_info = carriers.get(seg.get("marketingCarrierId", ""), {})
-
-                    carrier_code = carrier_info.get("name", "")
-                    carrier_name = CARRIER_NAMES.get(carrier_code, carrier_info.get("name", ""))
-
-                    all_segments.append({
-                        "carrier": carrier_name,
-                        "carrier_code": carrier_code,
-                        "flight_number": f"{carrier_code}{seg.get('flightNumber', '')}",
-                        "departure": seg.get("departureDateTime", ""),
-                        "arrival": seg.get("arrivalDateTime", ""),
-                        "departure_airport": dep_place.get("iata", ""),
-                        "arrival_airport": arr_place.get("iata", ""),
-                        "duration": seg.get("duration", ""),
-                    })
-
-                # Duration
-                duration_str = leg.get("duration", "")
-                if isinstance(duration_str, int):
-                    hours = duration_str // 60
-                    mins = duration_str % 60
-                    duration_str = f"{hours}h{mins:02d}m"
-
-                # Stops
-                num_stops = len(segment_ids) - 1 if segment_ids else 0
-
-                # Deep link
-                deep_link = ""
-                if price_info and price_info[0].get("deeplink"):
-                    deep_link = price_info[0]["deeplink"]
-
-                offers.append({
-                    "price": f"{curr_symbol}{float(price_val):.0f}" if price_val else "查看详情",
-                    "price_float": float(price_val) if price_val else 99999,
-                    "currency": currency,
-                    "duration": duration_str,
-                    "stops": num_stops,
-                    "segments": all_segments,
-                    "deep_link": deep_link,
-                    "source": "Skyscanner天巡",
-                })
-
-            except (KeyError, TypeError, ValueError) as e:
-                continue
-
-        offers.sort(key=lambda x: x["price_float"])
-        return offers
-
-
-# ============================================================
 # 12306 Train Ticket Query
 # ============================================================
 
@@ -1118,7 +896,7 @@ def query_12306_trains(dep_city: str, arr_city: str, date: str) -> list:
     req.add_header("Referer", "https://kyfw.12306.cn/otn/leftTicket/init")
 
     try:
-        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx_12306) as resp:
             raw = resp.read()
             # 12306 sometimes returns UTF-8 BOM, html error pages, or normal JSON
             text = raw.decode("utf-8-sig").strip()
@@ -1249,7 +1027,7 @@ def _fetch_12306_prices(trains: list, dep_code: str, date: str):
         req.add_header("Referer", "https://kyfw.12306.cn/otn/leftTicket/init")
 
         try:
-            with urllib.request.urlopen(req, timeout=10, context=_ssl_ctx) as resp:
+            with urllib.request.urlopen(req, timeout=10, context=_ssl_ctx_12306) as resp:
                 raw = resp.read().decode("utf-8-sig").strip()
                 if not raw.startswith("{"):
                     continue
@@ -1469,20 +1247,6 @@ def search_tickets(departure, arrival, date, ticket_type="all"):
             else:
                 output["api_status"]["amadeus"] = "not_configured"
 
-        # Fallback 3: Try Skyscanner API (requires overseas proxy)
-        if not flight_data_found:
-            skyscanner = SkyscannerClient()
-            if skyscanner.is_configured:
-                offers = skyscanner.search_flights(origin_iata, dest_iata, date, is_international)
-                if offers:
-                    output["flight_offers"] = offers
-                    output["api_status"]["skyscanner"] = "ok"
-                    flight_data_found = True
-                else:
-                    output["api_status"]["skyscanner"] = "no_results"
-            else:
-                output["api_status"]["skyscanner"] = "not_configured"
-
         # Tips for users without API keys
         if not flight_data_found:
             output["search_tips"].append(
@@ -1564,7 +1328,7 @@ def format_output(data):
                 elif source in ("tequila", "amadeus"):
                     lines.append(f"- **{source}**: 未配置API密钥（该API已停止新用户注册）")
                 elif source == "skyscanner":
-                    lines.append(f"- **{source}**: 未配置（需设置SKYSCANNER_PROXY或SKYSCANNER_NO_PROXY=true）")
+                    lines.append(f"- **{source}**: 未配置")
                 else:
                     lines.append(f"- **{source}**: 未配置")
             elif status == "skipped_international":
@@ -1624,36 +1388,6 @@ def format_output(data):
                     lines.append(f"{i}. **{offer['price']}** {seg_details} ({offer.get('duration','')})")
                 lines.append(f"")
 
-        elif source_name == "Skyscanner天巡":
-            # Skyscanner format (similar to Tequila)
-            lines.append(f"| 序号 | 航空公司 | 航班号 | 出发 | 到达 | 飞行时长 | 中转 | 价格 | 预订 |")
-            lines.append(f"|------|----------|--------|------|------|----------|------|------|------|")
-            for i, offer in enumerate(data["flight_offers"], 1):
-                seg = offer["segments"][0] if offer.get("segments") else {}
-                carrier = seg.get("carrier", "")
-                fn = seg.get("flight_number", "")
-                dep_time = seg.get("departure", "")[11:16] if seg.get("departure") else ""
-                arr_time = offer["segments"][-1].get("arrival", "")[11:16] if offer.get("segments") else ""
-                dur = offer.get("duration", "")
-                stops = offer.get("stops", 0)
-                price = offer["price"]
-                link = f"[预订]({offer['deep_link']})" if offer.get("deep_link") else ""
-                lines.append(f"| {i} | {carrier} | {fn} | {dep_time} | {arr_time} | {dur} | {stops}次中转 | {price} | {link} |")
-            lines.append(f"")
-
-            # Multi-segment detail
-            multi_seg = [o for o in data["flight_offers"] if o.get("stops", 0) > 0]
-            if multi_seg:
-                lines.append(f"### 中转航班详情")
-                lines.append(f"")
-                for i, offer in enumerate(multi_seg[:5], 1):
-                    segs = offer.get("segments", [])
-                    seg_details = " → ".join(
-                        f"{s.get('departure_airport','')}({s.get('departure','')[11:16] if s.get('departure') else ''})"
-                        for s in segs
-                    )
-                    lines.append(f"{i}. **{offer['price']}** {seg_details} ({offer.get('duration','')})")
-                lines.append(f"")
 
         else:
             # Amadeus format
@@ -1811,8 +1545,6 @@ if __name__ == "__main__":
         print("  TEQUILA_API_KEY       - Kiwi Tequila API key (registration may be closed)")
         print("  AMADEUS_CLIENT_ID     - Amadeus API client ID (registration closed)")
         print("  AMADEUS_CLIENT_SECRET - Amadeus API client secret")
-        print("  SKYSCANNER_PROXY      - HTTP/SOCKS5 proxy for Skyscanner (e.g., http://user:pass@host:port)")
-        print("  SKYSCANNER_NO_PROXY   - Set to 'true' if you're on an overseas IP (no proxy needed)")
         print("")
         print("Note: Flight prices are primarily fetched via web scraping (no API key needed).")
         print("      API keys are optional fallbacks for users who already have them.")

@@ -23,13 +23,6 @@ This skill enables real-time comparison of flight and train ticket prices. It fe
 ### Optional APIs (For Existing Key Holders Only)
 - **Kiwi.com Tequila API**: If `TEQUILA_API_KEY` is set (registration may no longer be available)
 - **Amadeus API**: If `AMADEUS_CLIENT_ID` + `AMADEUS_CLIENT_SECRET` are set (registration is closed)
-- **Skyscanner API**: If `SKYSCANNER_PROXY` is set, or `SKYSCANNER_NO_PROXY=true` for overseas IPs
-  - Uses irrisolto/skyscanner library to access Skyscanner Android API
-  - **Requires overseas proxy for Chinese IPs** — Skyscanner's PerimeterX anti-bot blocks Chinese IPs
-  - If you're already on an overseas IP (e.g., Japan, US, EU), set `SKYSCANNER_NO_PROXY=true` instead
-  - Set `SKYSCANNER_PROXY` env var, e.g., `http://user:pass@host:port` or `socks5://host:port`
-  - Residential proxies recommended for best results (when using proxy)
-  - Dependencies: `curl_cffi`, `typeguard`, `orjson`
 - These are used as fallbacks only when web scraping returns no results
 
 ## Core Capabilities
@@ -47,7 +40,6 @@ python scripts/ticket_search.py "<departure>" "<arrival>" "<date>" flight
 1. 携程 Web Scraping (no API key, may return prices or flight info)
 2. Tequila API (if API key configured)
 3. Amadeus API (if API keys configured)
-4. Skyscanner API (if SKYSCANNER_PROXY configured, requires overseas proxy)
 
 **Covered domestic platforms**: 携程旅行, 去哪儿旅行, 飞猪旅行, 同程旅行, 途牛旅游
 
@@ -123,9 +115,9 @@ If a user asks for "cheapest dates" or "price trends":
 
 - **Primary method**: Web scraping (携程) — no API key needed, but may not always work due to JavaScript rendering
 - **Fallback APIs**: Tequila/Amadeus — only for users who already have keys; registration is closed for new users
-- **Skyscanner API**: Requires overseas proxy (`SKYSCANNER_PROXY` env var) or set `SKYSCANNER_NO_PROXY=true` if already on overseas IP — Skyscanner's PerimeterX anti-bot blocks Chinese IPs; residential proxies work best
 - **Without any flight data**: Platform search links are always provided (users click to see prices)
 - **12306 train data** is always real-time (no API key needed)
+- **SSL verification**: Only disabled for 12306 endpoints (known certificate chain issues); all other connections use full TLS verification
 - Prices vary in real-time; recommend checking 2-3 platforms for confirmation
 - Airline official websites sometimes offer exclusive prices not available on OTA platforms
 - Always remind users about potential discount conditions before booking

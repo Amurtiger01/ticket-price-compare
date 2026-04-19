@@ -10,7 +10,7 @@
 
 - **零配置使用** — 携程爬取 + 12306 实时查询，无需注册任何 API
 - **火车票实时余票** — 直接调用 12306 公开接口，返回真实车次、余票、票价
-- **机票多源比价** — 携程爬取 / Tequila / Amadeus / Skyscanner 多数据源
+- **机票多源比价** — 携程爬取 / Tequila / Amadeus 多数据源
 - **国内 + 国际航线** — 同时支持中文城市名（北京→广州）和英文（Shanghai→Tokyo）
 - **平台搜索链接** — 一键直达携程、去哪儿、飞猪、同程、Skyscanner、Google Flights 等
 - **航空公司官网** — 覆盖 10 家国内航司 + 13 家国际航司
@@ -25,7 +25,6 @@
 | 携程爬取 | Web Scraping | 否 | 机票价格（JS 渲染页面，可能无数据） |
 | Tequila | REST API | 可选 | Kiwi.com 航班数据（注册已关闭） |
 | Amadeus | REST API | 可选 | 全球航班数据（注册已关闭） |
-| Skyscanner | Android API | 可选 | 需海外 IP 或代理 |
 
 ## 安装
 
@@ -44,12 +43,6 @@ python scripts/ticket_search.py 北京 广州 2026-05-01 train
 
 ```bash
 pip install amadeus>=12.0.0
-```
-
-如果你想使用 Skyscanner 数据源（需海外 IP）：
-
-```bash
-pip install curl_cffi>=0.6.0 typeguard>=3.0.0 orjson>=3.9.0
 ```
 
 ## 使用方法
@@ -86,23 +79,6 @@ python scripts/ticket_search.py Shanghai Tokyo 2026-06-15 all
 | `TEQUILA_API_KEY` | 否 | Kiwi.com Tequila API 密钥 |
 | `AMADEUS_CLIENT_ID` | 否 | Amadeus API Client ID |
 | `AMADEUS_CLIENT_SECRET` | 否 | Amadeus API Client Secret |
-| `SKYSCANNER_PROXY` | 否 | Skyscanner 代理地址，如 `http://user:pass@host:port` |
-| `SKYSCANNER_NO_PROXY` | 否 | 海外 IP 用户设为 `true` 可跳过代理要求 |
-
-### Skyscanner 代理说明
-
-Skyscanner 的 PerimeterX 反爬系统会封禁中国大陆 IP（返回 403）：
-
-- **中国大陆 IP 用户**：设置 `SKYSCANNER_PROXY` 为海外代理（推荐住宅代理）
-- **海外 IP 用户**（日本、美国、欧洲等）：设置 `SKYSCANNER_NO_PROXY=true` 即可直连
-
-```bash
-# 中国大陆 IP
-export SKYSCANNER_PROXY=http://user:pass@host:port
-
-# 海外 IP（如日本）
-export SKYSCANNER_NO_PROXY=true
-```
 
 ## 输出示例
 
@@ -140,28 +116,19 @@ CZ3104       PKX→CAN       08:00-11:10   ¥750
 ticket-price-compare/
 ├── SKILL.md                        # Skill 定义文件（触发条件、工作流）
 ├── README.md                       # 本文件
-├── references/
-│   └── platforms_guide.md          # 各平台优惠条件详细指南
 └── scripts/
     ├── ticket_search.py            # 核心搜索脚本
-    ├── requirements.txt            # 依赖声明（核心零依赖）
-    └── skyscanner_lib/             # Skyscanner Android API 库
-        ├── __init__.py
-        ├── config.py
-        ├── devicedata.json
-        ├── errors.py
-        ├── px.py                   # PerimeterX 绕过
-        ├── skyscanner.py           # Skyscanner 主逻辑
-        └── types.py
+    └── requirements.txt            # 依赖声明（核心零依赖）
 ```
 
 ## 技术细节
 
-- **核心零依赖**：`ticket_search.py` 仅使用 Python 标准库（`urllib`, `json`, `ssl`）
-- **12306 接口**：使用 `leftTicket/queryZ` 公开端点，无需登录
-- **携程爬取**：尝试直接请求航班搜索页面，若 JS 渲染则退回提供链接
-- **城市名映射**：内置 200+ 中国城市/车站名到 IATA/电报码的映射
-- **编码兼容**：自动处理 Windows 控制台 UTF-8 编码问题
+- **核心零依赖** — `ticket_search.py` 仅使用 Python 标准库（`urllib`, `json`, `ssl`）
+- **12306 接口** — 使用 `leftTicket/queryZ` 公开端点，无需登录
+- **携程爬取** — 尝试直接请求航班搜索页面，若 JS 渲染则退回提供链接
+- **城市名映射** — 内置 200+ 中国城市/车站名到 IATA/电报码的映射
+- **SSL 安全** — 仅对 12306 端点禁用证书验证（其证书链有已知问题），其余连接均使用完整 TLS 验证
+- **编码兼容** — 自动处理 Windows 控制台 UTF-8 编码问题
 
 ## 作为 AI Skill 使用
 
