@@ -277,7 +277,7 @@ ticket-price-compare/
 - **Dual-Source Ctrip** - PC page (`flights.ctrip.com`) for per-flight details; mobile H5 (`m.ctrip.com`) for price calendar fallback
 - **12306 Endpoints** - Uses `leftTicket/queryZ` for schedules + `queryTicketPrice` for actual fares, no login required
 - **City Name Mapping** - Built-in 200+ Chinese city/station name to IATA/telegraph code mapping
-- **SSL Security** - Only 12306 endpoint has certificate verification disabled (known cert chain issues); all other connections use full TLS verification
+- **SSL Security** - 12306 endpoints use a "verify first, fallback on error" strategy: full TLS verification is attempted first; only if SSL certificate errors occur does it fall back to unverified mode. All other connections always use full TLS verification.
 - **Encoding Compatibility** - Auto-handles Windows console UTF-8 encoding issues
 
 ## Flight Data Source Priority

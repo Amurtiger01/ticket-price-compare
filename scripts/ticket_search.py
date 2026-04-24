@@ -59,10 +59,31 @@ try:
 except ImportError:
     HAS_AMADEUS_SDK = False
 
-# SSL context for 12306 only (their certificate has chain issues on some systems)
-_ssl_ctx_12306 = ssl.create_default_context()
-_ssl_ctx_12306.check_hostname = False
-_ssl_ctx_12306.verify_mode = ssl.CERT_NONE
+# SSL context for 12306: try with verification first, fall back to unverified.
+# 12306.cn has known certificate chain issues on some networks/systems,
+# but we should NOT blindly disable SSL verification. Instead, we use a
+# "verify first, fallback on error" approach to minimize MITM risk.
+_ssl_ctx_verified = ssl.create_default_context()  # Full TLS verification
+_ssl_ctx_unverified = ssl.create_default_context()
+_ssl_ctx_unverified.check_hostname = False
+_ssl_ctx_unverified.verify_mode = ssl.CERT_NONE
+
+
+def _urlopen_12306(req, timeout=15):
+    """Open a URL to 12306 with SSL verification, falling back to unverified on cert errors.
+
+    This limits the MITM exposure window: only if the verified connection
+    fails due to certificate issues do we retry without verification.
+    All other errors (network, timeout, HTTP) propagate normally.
+    """
+    try:
+        return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_verified)
+    except (ssl.SSLError, urllib.error.URLError) as e:
+        # Only fallback on SSL certificate errors, not other network errors
+        if isinstance(e, ssl.SSLError) or "CERTIFICATE" in str(e).upper() or "SSL" in str(e).upper():
+            print(f"[12306] SSL verification failed, falling back to unverified: {e}", file=sys.stderr)
+            return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_unverified)
+        raise
 
 
 # ============================================================
@@ -1463,7 +1484,7 @@ def query_12306_trains(dep_city: str, arr_city: str, date: str) -> list:
     req.add_header("Referer", "https://kyfw.12306.cn/otn/leftTicket/init")
 
     try:
-        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx_12306) as resp:
+        with _urlopen_12306(req, timeout=15) as resp:
             raw = resp.read()
             # 12306 sometimes returns UTF-8 BOM, html error pages, or normal JSON
             text = raw.decode("utf-8-sig").strip()
@@ -1594,7 +1615,7 @@ def _fetch_12306_prices(trains: list, dep_code: str, date: str):
         req.add_header("Referer", "https://kyfw.12306.cn/otn/leftTicket/init")
 
         try:
-            with urllib.request.urlopen(req, timeout=10, context=_ssl_ctx_12306) as resp:
+            with _urlopen_12306(req, timeout=10) as resp:
                 raw = resp.read().decode("utf-8-sig").strip()
                 if not raw.startswith("{"):
                     continue

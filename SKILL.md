@@ -131,7 +131,7 @@ If a user asks for "cheapest dates" or "price trends":
 - **Fallback APIs**: Tequila/Amadeus - only for users who already have keys; registration is closed for new users
 - **Without any flight data**: Platform search links are always provided (users click to see prices)
 - **12306 train data** is always real-time (no API key needed)
-- **SSL verification**: Only disabled for 12306 endpoints (known certificate chain issues); all other connections use full TLS verification
+- **SSL verification**: 12306 endpoints use a "verify first, fallback on error" strategy — full TLS verification is attempted first; only if SSL certificate errors occur does it fall back to unverified mode. All other connections use full TLS verification at all times.
 - **Firecrawl proxy**: Uses `proxy: "basic"` for optimal reliability with Chinese booking sites
 - Prices vary in real-time; recommend checking 2-3 platforms for confirmation
 - Airline official websites sometimes offer exclusive prices not available on OTA platforms
