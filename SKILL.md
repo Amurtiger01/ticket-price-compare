@@ -106,13 +106,16 @@ Always include the dedicated "Discount Conditions / Restrictions" section. Refer
 
 2. **Execute search**: Run `scripts/ticket_search.py` with the parameters.
 
-3. **Present results**: Show the complete output including:
-   - Real-time prices (if available from Firecrawl, scraping, or API)
+3. **Present results**: Show the **complete output** from the script. **IMPORTANT**: Do NOT summarize or omit train ticket price information. Always include:
+   - **Train ticket prices** - The "票价（余票）" column contains actual fares like `二等座¥305(有) / 一等座¥488(12)`. This is real-time pricing data from 12306 and MUST be shown to the user.
+   - **Flight prices** (if available from Firecrawl, scraping, or API)
    - All platform links for comparison
    - Discount conditions section
    - Search tips
 
-4. **If no flight prices returned**: Inform the user that real-time flight prices could not be fetched automatically, and recommend clicking the platform links to compare prices manually. Mention that 12306 train data is always available for domestic routes.
+4. **If no flight prices returned**: Inform the user that real-time flight prices could not be fetched automatically, and recommend clicking the platform links to compare prices manually. **Always mention that 12306 train data with real-time prices is available for domestic routes.**
+
+5. **When user asks for "all" or combined search**: Present train results and flight results side by side. Do NOT skip or truncate the train price table even when flight data is extensive.
 
 ## Date Flexibility
 

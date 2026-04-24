@@ -2061,26 +2061,30 @@ def format_output(data):
         lines.append(f"## 实时火车票信息（来自12306）")
         lines.append(f"")
 
-        if has_prices:
-            lines.append(f"| 车次 | 类型 | 出发站→到达站 | 时间 | 历时 | 票价 | 余票 |")
-            lines.append(f"|------|------|--------------|------|------|------|------|")
-            for train in data["train_offers"]:
-                # Format prices
-                price_str = " / ".join(f"{k}{v}" for k, v in train.get("prices", {}).items()) if train.get("prices") else "查询失败"
-                # Format seats (only show count, not label again since price already has it)
-                seats_str = " / ".join(f"{v}" for v in train["seats"].values()) if train["seats"] else "无"
-                route = f"{train['from_station']}→{train['to_station']}"
-                time_range = f"{train['departure_time']}-{train['arrival_time']}"
-                lines.append(f"| {train['train_code']} | {train['train_type']} | {route} | "
-                             f"{time_range} | {train['duration']} | {price_str} | {seats_str} |")
-
-            lines.append(f"| 车次 | 类型 | 出发站 | 到达站 | 出发时间 | 到达时间 | 历时 | 可售席位 |")
-            lines.append(f"|------|------|--------|--------|----------|----------|------|----------|")
-            for train in data["train_offers"]:
-                seats_str = " / ".join(f"{k}:{v}" for k, v in train["seats"].items()) if train["seats"] else "暂无"
-                lines.append(f"| {train['train_code']} | {train['train_type']} | {train['from_station']} | "
-                             f"{train['to_station']} | {train['departure_time']} | {train['arrival_time']} | "
-                             f"{train['duration']} | {seats_str} |")
+        # Unified table with all info: schedule + price + seat availability
+        lines.append(f"| 车次 | 类型 | 出发站→到达站 | 时间 | 历时 | 票价（余票） |")
+        lines.append(f"|------|------|--------------|------|------|-------------|")
+        for train in data["train_offers"]:
+            route = f"{train['from_station']}→{train['to_station']}"
+            time_range = f"{train['departure_time']}-{train['arrival_time']}"
+            # Combine price and seat count into one column: "商务座¥830(12) / 一等座¥488(有)"
+            if train.get("prices") and train.get("seats"):
+                parts = []
+                for seat_label, price in train["prices"].items():
+                    seat_count = train["seats"].get(seat_label, "")
+                    if seat_count:
+                        parts.append(f"{seat_label}{price}({seat_count})")
+                    else:
+                        parts.append(f"{seat_label}{price}")
+                price_seat_str = " / ".join(parts)
+            elif train.get("prices"):
+                price_seat_str = " / ".join(f"{k}{v}" for k, v in train["prices"].items())
+            elif train.get("seats"):
+                price_seat_str = " / ".join(f"{k}:{v}" for k, v in train["seats"].items()) + "（票价查询失败）"
+            else:
+                price_seat_str = "暂无"
+            lines.append(f"| {train['train_code']} | {train['train_type']} | {route} | "
+                         f"{time_range} | {train['duration']} | {price_seat_str} |")
         lines.append(f"")
 
         lines.append(f"## 火车票优惠条件")
