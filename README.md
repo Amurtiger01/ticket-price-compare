@@ -37,41 +37,163 @@
 - **Proxy Optimization** - Switched from `proxy: "auto"` to `proxy: "basic"` for better reliability with Chinese booking sites
 - **Enhanced Train Prices** - 12306 `queryTicketPrice` endpoint integration for actual fare data per seat type
 
-## Installation
+## Quick Start (Zero Config)
 
-### 1. Core (No Dependencies)
-
-The script uses only Python standard library, no extra packages needed:
+The script uses only Python standard library, no extra packages needed. Train tickets (12306) work out of the box:
 
 ```bash
-# No pip install needed, just run
 python scripts/ticket_search.py Beijing Guangzhou 2026-05-01 train
 ```
 
-### 2. Optional: Firecrawl (Recommended for Flight Data)
-
-Set the `FIRECRAWL_API_KEY` environment variable to enable detailed flight data:
+Flight search also works without any API key (provides platform links for manual comparison):
 
 ```bash
-# Linux/macOS
-export FIRECRAWL_API_KEY="your-api-key-here"
-
-# Windows CMD
-set FIRECRAWL_API_KEY=your-api-key-here
-
-# Windows PowerShell
-$env:FIRECRAWL_API_KEY="your-api-key-here"
+python scripts/ticket_search.py Beijing Guangzhou 2026-05-01 flight
 ```
 
-Register for a free API key at [firecrawl.dev](https://firecrawl.dev). No pip install needed - the script calls Firecrawl's REST API directly via `urllib`.
+> **Tip**: To get detailed flight prices (flight numbers, times, aircraft types) instead of just links, set the `FIRECRAWL_API_KEY` environment variable. See [API Key Setup Guide](#api-key-setup-guide) below.
 
-### 3. Optional: Amadeus SDK
+## API Key Setup Guide
 
-If you want to use the Amadeus API:
+All API keys are **optional**. The script works without any configuration (train data always available, flight links always provided). API keys only enhance the flight data quality.
+
+### Key Required vs Optional Summary
+
+| API Key | Required? | What It Enables | Registration Status |
+|---------|:---------:|----------------|---------------------|
+| `FIRECRAWL_API_KEY` | **Recommended** | Detailed Ctrip flight data (flight numbers, times, aircraft, prices) | **Open** - Free tier available |
+| `TEQUILA_API_KEY` | No | Kiwi.com international flight data | **Closed** |
+| `AMADEUS_CLIENT_ID` + `AMADEUS_CLIENT_SECRET` | No | Amadeus global flight data | **Closed** |
+
+---
+
+### 1. Firecrawl API Key (Recommended - Free Tier Available)
+
+Firecrawl renders Ctrip's JavaScript-heavy flight pages, extracting detailed flight data that direct HTTP requests cannot get.
+
+#### Step 1: Register
+
+1. Go to [https://firecrawl.dev](https://firecrawl.dev)
+2. Click **"Get Started"** or **"Sign Up"**
+3. Sign up with Google/GitHub/email
+4. Free tier includes **500 credits/month** (each scrape = 1 credit)
+
+#### Step 2: Get Your API Key
+
+1. After login, go to the **Dashboard**
+2. Copy your **API Key** (format: `fc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
+
+#### Step 3: Set Environment Variable
+
+**Linux / macOS** (temporary, current session only):
+```bash
+export FIRECRAWL_API_KEY="fc-your-actual-api-key-here"
+```
+
+**Linux / macOS** (permanent, add to `~/.bashrc` or `~/.zshrc`):
+```bash
+echo 'export FIRECRAWL_API_KEY="fc-your-actual-api-key-here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Windows CMD** (temporary, current window only):
+```cmd
+set FIRECRAWL_API_KEY=fc-your-actual-api-key-here
+```
+
+**Windows CMD** (permanent, system-level):
+```cmd
+setx FIRECRAWL_API_KEY "fc-your-actual-api-key-here"
+```
+> Note: `setx` takes effect in **new** terminal windows, not the current one.
+
+**Windows PowerShell** (temporary, current session only):
+```powershell
+$env:FIRECRAWL_API_KEY = "fc-your-actual-api-key-here"
+```
+
+**Windows PowerShell** (permanent, user-level):
+```powershell
+[Environment]::SetEnvironmentVariable("FIRECRAWL_API_KEY", "fc-your-actual-api-key-here", "User")
+```
+> Note: Takes effect in **new** PowerShell sessions.
+
+#### Step 4: Verify
+
+```bash
+python scripts/ticket_search.py Beijing Shanghai 2026-05-01 flight
+```
+If you see `Data Source: Ctrip (via Firecrawl)` in the output, the key is working.
+
+> **No pip install needed** - the script calls Firecrawl's REST API directly via Python's built-in `urllib` library.
+
+---
+
+### 2. Tequila API Key (Optional - Registration Closed)
+
+Kiwi.com Tequila API for international flight data. **Self-service registration is no longer available.**
+
+If you already have a key:
+
+**Linux / macOS:**
+```bash
+export TEQUILA_API_KEY="your-tequila-api-key"
+```
+
+**Windows CMD:**
+```cmd
+set TEQUILA_API_KEY=your-tequila-api-key
+```
+
+**Windows PowerShell:**
+```powershell
+$env:TEQUILA_API_KEY = "your-tequila-api-key"
+```
+
+---
+
+### 3. Amadeus API Keys (Optional - Registration Closed)
+
+Amadeus API for global flight data. **Self-service registration is closed.**
+
+If you already have keys, you also need to install the SDK:
 
 ```bash
 pip install amadeus>=12.0.0
 ```
+
+Then set both environment variables:
+
+**Linux / macOS:**
+```bash
+export AMADEUS_CLIENT_ID="your-client-id"
+export AMADEUS_CLIENT_SECRET="your-client-secret"
+```
+
+**Windows CMD:**
+```cmd
+set AMADEUS_CLIENT_ID=your-client-id
+set AMADEUS_CLIENT_SECRET=your-client-secret
+```
+
+**Windows PowerShell:**
+```powershell
+$env:AMADEUS_CLIENT_ID = "your-client-id"
+$env:AMADEUS_CLIENT_SECRET = "your-client-secret"
+```
+
+---
+
+### Environment Variable Quick Reference
+
+| Variable | Where to Get | Format | Required? |
+|----------|-------------|--------|:---------:|
+| `FIRECRAWL_API_KEY` | [firecrawl.dev](https://firecrawl.dev) Dashboard | `fc-xxxx...` | Recommended |
+| `TEQUILA_API_KEY` | Kiwi.com (closed) | String | No |
+| `AMADEUS_CLIENT_ID` | Amadeus (closed) | String | No |
+| `AMADEUS_CLIENT_SECRET` | Amadeus (closed) | String | No |
+
+> **Note**: Environment variables set via `export`/`set`/`$env:` are session-only and will be lost when you close the terminal. Use `setx` (Windows) or add to `~/.bashrc` (Linux/macOS) for persistence.
 
 ## Usage
 
@@ -99,15 +221,6 @@ python scripts/ticket_search.py Beijing Guangzhou 2026-04-20 all
 python scripts/ticket_search.py Shanghai Tokyo 2026-06-15 flight
 python scripts/ticket_search.py Shanghai Tokyo 2026-06-15 all
 ```
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|:--------:|-------------|
-| `FIRECRAWL_API_KEY` | No | Firecrawl API key for JS-rendered Ctrip flight data. Register at [firecrawl.dev](https://firecrawl.dev) |
-| `TEQUILA_API_KEY` | No | Kiwi.com Tequila API key (registration closed) |
-| `AMADEUS_CLIENT_ID` | No | Amadeus API Client ID (registration closed) |
-| `AMADEUS_CLIENT_SECRET` | No | Amadeus API Client Secret (registration closed) |
 
 ## Output Examples
 
