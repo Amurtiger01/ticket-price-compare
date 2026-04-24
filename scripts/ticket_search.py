@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Ticket Price Search Script v6.0
+Ticket Price Search Script v6.2
 Searches and compares flight and train ticket prices across major platforms.
-Uses web scraping (携程/去哪儿) for real-time flight prices - NO API KEY NEEDED.
+Uses web scraping (Ctrip/Qunar) for real-time flight prices - NO API KEY NEEDED.
 Uses 12306 public API for real-time train availability AND prices.
-Optionally supports Tequila/Amadeus API for users who already have keys.
+Optionally supports Firecrawl (JS rendering) for detailed flight data, Tequila/Amadeus API for users who already have keys.
 
 Data Sources (no registration required):
-  1. 携程/去哪儿 Web Scraping (primary, no API key needed):
+  1. Ctrip/Qunar Web Scraping (primary, no API key needed):
      - Scrapes public flight search pages for price data
      - Works out of the box, no setup required
 
@@ -17,14 +17,19 @@ Data Sources (no registration required):
      - No login required for either endpoint
 
 Optional API (for users who already have keys):
-  3. Kiwi.com Tequila API (if TEQUILA_API_KEY is set)
+  3. Firecrawl API (if FIRECRAWL_API_KEY is set)
+     - Renders JavaScript pages, gets detailed flight info from Ctrip PC page
+     - PC page: individual flight numbers, times, aircraft types, prices
+     - Mobile page: price calendar with daily lowest prices (fallback)
+     - Register at https://firecrawl.dev
+  4. Kiwi.com Tequila API (if TEQUILA_API_KEY is set)
      - Note: Registration may no longer be available
-  4. Amadeus API (if AMADEUS_CLIENT_ID + AMADEUS_CLIENT_SECRET are set)
+  5. Amadeus API (if AMADEUS_CLIENT_ID + AMADEUS_CLIENT_SECRET are set)
      - Note: Self-service registration is NO LONGER available
 
 Usage:
   python ticket_search.py <departure> <arrival> <date> [flight|train|all]
-  python ticket_search.py 北京 上海 2026-05-01 flight
+  python ticket_search.py Beijing Shanghai 2026-05-01 flight
   python ticket_search.py Shanghai Tokyo 2026-06-15 all
 """
 
@@ -539,6 +544,568 @@ class CtripScraper:
                     "cabin": "",
                     "source": "携程网页(部分数据)",
                 })
+
+        return offers
+
+
+# ============================================================
+# Firecrawl Scraper (JS-rendered page support, optional)
+# ============================================================
+
+class FirecrawlScraper:
+    """Scrapes Ctrip flight pages via Firecrawl API (renders JavaScript).
+
+    Supports two modes:
+    1. PC flight list page (PRIMARY): Returns detailed flight info with flight numbers,
+       times, aircraft types, and individual prices for each flight.
+    2. Mobile H5 price calendar (FALLBACK): Returns daily lowest prices across dates.
+
+    Requires FIRECRAWL_API_KEY environment variable.
+    Falls back gracefully if not configured.
+    """
+
+    API_URL = "https://api.firecrawl.dev/v2/scrape"
+
+    def __init__(self):
+        self.api_key = os.environ.get("FIRECRAWL_API_KEY", "")
+        self.is_configured = bool(self.api_key)
+
+    def _call_api(self, url, mobile=True, wait_ms=15000):
+        """Make a Firecrawl scrape API call and return markdown content."""
+        payload = json.dumps({
+            "url": url,
+            "formats": ["markdown"],
+            "onlyMainContent": True,
+            "waitFor": wait_ms,
+            "timeout": 30000,
+            "mobile": mobile,
+            "proxy": "basic",
+            "blockAds": True,
+            "storeInCache": True,
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            self.API_URL,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+
+            if not result.get("success"):
+                print(f"[Firecrawl] API returned unsuccessful response", file=sys.stderr)
+                return ""
+
+            data = result.get("data", {})
+            return data.get("markdown", "")
+
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+            print(f"[Firecrawl] HTTP error {e.code}: {body[:200]}", file=sys.stderr)
+            return ""
+        except Exception as e:
+            print(f"[Firecrawl] Request failed: {e}", file=sys.stderr)
+            return ""
+
+    def search_flights(self, dep_city: str, arr_city: str, date: str, is_international: bool = False) -> list:
+        """Search flight prices via Firecrawl.
+
+        Tries PC flight list page first (detailed flight info), then falls back
+        to mobile price calendar (daily lowest prices only).
+
+        Args:
+            dep_city: Departure city name or IATA code
+            arr_city: Arrival city name or IATA code
+            date: Departure date YYYY-MM-DD
+            is_international: Whether this is an international route
+
+        Returns:
+            List of flight offer dicts
+        """
+        if not self.is_configured:
+            return []
+
+        dep_iata = _get_iata(dep_city)
+        arr_iata = _get_iata(arr_city)
+
+        # Primary: Try PC flight list page for detailed flight data
+        offers = self.search_flights_detailed(dep_iata, arr_iata, date, is_international)
+        if offers:
+            return offers
+
+        # Fallback: Try mobile H5 price calendar
+        return self.search_price_calendar(dep_iata, arr_iata, date)
+
+    def search_flights_detailed(self, dep_iata: str, arr_iata: str, date: str, is_international: bool = False) -> list:
+        """Search detailed flight info via Ctrip PC page (Firecrawl renders JS).
+
+        The PC page returns individual flight entries with:
+        - Flight number (e.g., CA8357, MU5100)
+        - Departure/arrival times
+        - Airport and terminal info
+        - Aircraft type
+        - Individual price per flight
+        - Cabin class and discount
+
+        Args:
+            dep_iata: Departure IATA code
+            arr_iata: Arrival IATA code
+            date: Departure date YYYY-MM-DD
+            is_international: Whether this is an international route
+
+        Returns:
+            List of flight offer dicts with detailed info
+        """
+        # Ctrip PC flight search URL
+        url = f"https://flights.ctrip.com/online/list/oneway-{dep_iata}-{arr_iata}?depdate={date}&cabin=y"
+
+        print(f"[Firecrawl-PC] Scraping Ctrip PC flight list: {url}", file=sys.stderr)
+        markdown = self._call_api(url, mobile=False, wait_ms=15000)
+
+        if not markdown:
+            return []
+
+        offers = self._parse_flight_list(markdown, dep_iata, arr_iata, date)
+        if offers:
+            print(f"[Firecrawl-PC] Parsed {len(offers)} flights from Ctrip PC page", file=sys.stderr)
+        else:
+            print(f"[Firecrawl-PC] No flight data parsed from Ctrip PC page", file=sys.stderr)
+
+        return offers
+
+    def search_price_calendar(self, dep_iata: str, arr_iata: str, date: str) -> list:
+        """Search via Ctrip mobile H5 price calendar (daily lowest prices only).
+
+        The mobile page includes a price calendar showing daily lowest
+        prices for 2+ months. Less detailed than PC but works as fallback.
+
+        Args:
+            dep_iata: Departure IATA code
+            arr_iata: Arrival IATA code
+            date: Departure date YYYY-MM-DD
+
+        Returns:
+            List of flight offer dicts (price calendar data)
+        """
+        url = f"https://m.ctrip.com/html5/flight/swift/domestic/{dep_iata}-{arr_iata}?date={date}"
+
+        print(f"[Firecrawl-Mobile] Scraping Ctrip mobile price calendar: {url}", file=sys.stderr)
+        markdown = self._call_api(url, mobile=True, wait_ms=10000)
+
+        if not markdown:
+            return []
+
+        offers = self._parse_price_calendar(markdown, dep_iata, arr_iata, date)
+        if offers:
+            print(f"[Firecrawl-Mobile] Parsed price calendar data", file=sys.stderr)
+
+        return offers
+
+    def _parse_flight_list(self, markdown: str, dep_iata: str, arr_iata: str, target_date: str) -> list:
+        """Parse Ctrip PC flight list page markdown into structured flight offers.
+
+        The PC page markdown contains flight entries in this pattern:
+            [airline logo image]
+            Airline Name
+            FLIGHT_NUMBER Aircraft_Type
+            DEPARTURE_TIME
+            Airport Terminal
+            ARRIVAL_TIME
+            Airport Terminal
+            [promotions]
+            ¥PRICE起
+            Cabin_Class
+            订票
+
+        Returns:
+            List of flight offer dicts with detailed information.
+        """
+        offers = []
+
+        # Split markdown by airline logo markers (each flight starts with an airline logo)
+        # The logo pattern: ![AirlineName](https://...airline/XX.png)
+        # Split by this to get individual flight blocks
+        flight_blocks = re.split(r'!\[.*?\]\(https://static\.tripcdn\.com/packages/flight/airline-logo/', markdown)
+
+        for block in flight_blocks[1:]:  # Skip the first block (before any airline logo)
+            try:
+                offer = self._parse_single_flight(block)
+                if offer and offer.get("price_float"):
+                    offers.append(offer)
+            except Exception:
+                continue
+
+        # If logo-based split didn't work well, try alternative parsing
+        if len(offers) < 2:
+            offers = self._parse_flight_list_alt(markdown, dep_iata, arr_iata, target_date)
+
+        # Deduplicate by flight number
+        seen = set()
+        unique_offers = []
+        for o in offers:
+            fn = o.get("flight_number", "")
+            key = f"{fn}_{o.get('departure_time', '')}_{o.get('price', '')}"
+            if key not in seen and fn:
+                seen.add(key)
+                unique_offers.append(o)
+
+        # Sort by price
+        unique_offers.sort(key=lambda x: x.get("price_float", 99999))
+
+        return unique_offers
+
+    def _parse_single_flight(self, block: str) -> dict:
+        """Parse a single flight block from Ctrip PC markdown.
+
+        Block format (after airline logo split):
+            XX.png)\n\nAirline Name\n\nFLIGHT_NUMBER Aircraft_Type\n\n...
+        """
+        # Extract airline name - first line after the logo
+        lines = [l.strip() for l in block.split("\n") if l.strip()]
+
+        if len(lines) < 5:
+            return None
+
+        # Airline name is typically the first meaningful line
+        airline_name = ""
+        flight_number = ""
+        aircraft_type = ""
+        dep_time = ""
+        arr_time = ""
+        dep_terminal = ""
+        arr_terminal = ""
+        price = 0
+        cabin = ""
+        stops = 0
+
+        # Find flight number pattern: XX1234 or XX123 at start of line
+        fn_pattern = re.compile(r'^([A-Z]{2}\d{3,4})\s*(.*)$')
+
+        i = 0
+        # Skip the logo line (XX.png))
+        if lines[0].endswith('.png)'):
+            i = 1
+
+        # Airline name
+        if i < len(lines) and not fn_pattern.match(lines[i]):
+            airline_name = lines[i]
+            i += 1
+
+        # Flight number + aircraft type
+        if i < len(lines):
+            fn_match = fn_pattern.match(lines[i])
+            if fn_match:
+                flight_number = fn_match.group(1)
+                aircraft_type = fn_match.group(2).strip()
+                i += 1
+
+        # Scan remaining lines for times, terminals, price
+        time_pattern = re.compile(r'^(\d{1,2}:\d{2})$')
+        terminal_pattern = re.compile(r'(国际机场|机场)(T\d)')
+        price_pattern = re.compile(r'[¥￥]\s*(\d{2,6})')
+        cabin_pattern = re.compile(r'(经济舱|公务舱|头等舱)')
+
+        times_found = []
+        terminals_found = []
+
+        while i < len(lines):
+            line = lines[i]
+
+            # Time pattern
+            t_match = time_pattern.match(line)
+            if t_match:
+                times_found.append(t_match.group(1))
+                i += 1
+                continue
+
+            # Terminal pattern
+            t2_match = terminal_pattern.search(line)
+            if t2_match:
+                terminals_found.append(t2_match.group(2))
+                i += 1
+                continue
+
+            # Price pattern
+            p_match = price_pattern.search(line)
+            if p_match:
+                try:
+                    price = int(p_match.group(1))
+                except ValueError:
+                    pass
+                i += 1
+                continue
+
+            # Cabin pattern
+            c_match = cabin_pattern.search(line)
+            if c_match:
+                cabin = c_match.group(1)
+                i += 1
+                continue
+
+            # Detect stops (中转)
+            if '中转' in line or '转1次' in line:
+                stops = 1
+            elif '转2次' in line:
+                stops = 2
+
+            # "+1天" or "+2天" means next day arrival
+            if '+1天' in line or '+2天' in line:
+                arr_time = line.strip()  # Will be overridden if there's a time
+
+            i += 1
+
+        if len(times_found) >= 2:
+            dep_time = times_found[0]
+            arr_time = times_found[1]
+        elif len(times_found) == 1:
+            dep_time = times_found[0]
+
+        # Must have at least flight number and price
+        if not flight_number or not price:
+            return None
+
+        return {
+            "price": f"{price} CNY",
+            "price_float": float(price),
+            "currency": "CNY",
+            "carrier": airline_name,
+            "flight_number": flight_number,
+            "departure_time": dep_time,
+            "arrival_time": arr_time,
+            "duration": "",
+            "stops": stops,
+            "cabin": cabin,
+            "aircraft": aircraft_type,
+            "dep_terminal": terminals_found[0] if len(terminals_found) > 0 else "",
+            "arr_terminal": terminals_found[1] if len(terminals_found) > 1 else "",
+            "source": "Ctrip(Firecrawl-PC)",
+        }
+
+    def _parse_flight_list_alt(self, markdown: str, dep_iata: str, arr_iata: str, target_date: str) -> list:
+        """Alternative parser for Ctrip PC flight list using regex on full markdown.
+
+        Used when the logo-based split doesn't produce good results.
+        Searches for flight_number + time + price patterns.
+        """
+        offers = []
+
+        # Find all flight numbers
+        flight_matches = list(re.finditer(
+            r'([A-Z]{2}\d{3,4})\s*([^\n]*)',
+            markdown
+        ))
+
+        for fm in flight_matches:
+            flight_number = fm.group(1)
+            aircraft_info = fm.group(2).strip()
+
+            # Skip common false positives (like image URLs)
+            if flight_number in ("MP4", "MP3", "JPEG", "GIF2", "PNG2"):
+                continue
+
+            # Look for surrounding context (200 chars before and after)
+            start = max(0, fm.start() - 50)
+            end = min(len(markdown), fm.end() + 300)
+            context = markdown[start:end]
+
+            # Extract times in context
+            times = re.findall(r'\b(\d{1,2}:\d{2})\b', context)
+            dep_time = times[0] if len(times) >= 1 else ""
+            arr_time = times[1] if len(times) >= 2 else ""
+
+            # Extract price in context (after flight number)
+            after_fn = markdown[fm.end():fm.end() + 300]
+            price_match = re.search(r'[¥￥]\s*(\d{2,6})', after_fn)
+            price = 0
+            if price_match:
+                try:
+                    price = int(price_match.group(1))
+                except ValueError:
+                    pass
+
+            # Extract airline name - look backwards from flight number
+            before_fn = markdown[max(0, fm.start() - 100):fm.start()]
+            # Airline name is usually the last line before flight number
+            airline_lines = [l.strip() for l in before_fn.split("\n") if l.strip()]
+            airline_name = airline_lines[-1] if airline_lines else ""
+
+            # Clean up airline name (remove markdown artifacts)
+            airline_name = re.sub(r'[!\[\]()]', '', airline_name).strip()
+            if len(airline_name) > 20 or len(airline_name) < 2:
+                airline_name = ""
+
+            # Extract cabin class
+            cabin = ""
+            cabin_match = re.search(r'(经济舱|公务舱|头等舱)', after_fn)
+            if cabin_match:
+                cabin = cabin_match.group(1)
+
+            # Detect stops
+            stops = 0
+            if '中转' in after_fn or '转1次' in after_fn:
+                stops = 1
+            elif '转2次' in after_fn:
+                stops = 2
+
+            # Only add if we have at least a price
+            if price >= 50:
+                offers.append({
+                    "price": f"{price} CNY",
+                    "price_float": float(price),
+                    "currency": "CNY",
+                    "carrier": airline_name,
+                    "flight_number": flight_number,
+                    "departure_time": dep_time,
+                    "arrival_time": arr_time,
+                    "duration": "",
+                    "stops": stops,
+                    "cabin": cabin,
+                    "aircraft": aircraft_info,
+                    "source": "Ctrip(Firecrawl-PC)",
+                })
+
+        return offers
+
+    def _parse_price_calendar(self, markdown: str, dep_iata: str, arr_iata: str, target_date: str) -> list:
+        """Parse Ctrip mobile page price calendar from Firecrawl markdown output.
+
+        The mobile H5 page includes a date selector with daily lowest prices.
+        In markdown the pattern looks like:
+            24\n¥500\n25\n¥380\n26\n¥360
+
+        We extract prices for all visible dates and match against the target date.
+
+        Returns:
+            List with a single offer dict for the target date,
+            plus optional nearby-date comparison data.
+        """
+        offers = []
+
+        # Extract year-month headers and date-price pairs
+        # Pattern: "2026年4月" or "2026年5月" followed by date-price data
+        year_month_pattern = r'(\d{4})\u5e74(\d{1,2})\u6708'
+
+        # Split markdown by year-month headers to know which month each price belongs to
+        parts = re.split(year_month_pattern, markdown)
+        # parts: [pre, year1, month1, content1, year2, month2, content2, ...]
+
+        date_prices = {}  # "YYYY-MM-DD" -> price
+
+        for i in range(1, len(parts) - 2, 3):
+            year = parts[i]
+            month = parts[i + 1].zfill(2)
+            content = parts[i + 2]
+
+            # Find day-price pairs: standalone number followed by ¥price
+            # Handles various markdown spacing: "24\n¥500" or "24\n\n¥500"
+            day_price_pairs = re.findall(
+                r'(?:^|\n)\s*(\d{1,2})\s*\n\s*[¥￥]\s*(\d{2,6})',
+                content
+            )
+            for day_str, price_str in day_price_pairs:
+                day = day_str.zfill(2)
+                date_key = f"{year}-{month}-{day}"
+                try:
+                    price = int(price_str)
+                    if 50 < price < 50000:
+                        date_prices[date_key] = price
+                except (ValueError, IndexError):
+                    continue
+
+        # If no structured parsing worked, try a relaxed scan across the whole markdown
+        if not date_prices:
+            # Find all ¥price patterns and their preceding day number
+            relaxed_pairs = re.findall(
+                r'(\d{1,2})\s*\n+[¥￥]\s*(\d{2,6})',
+                markdown
+            )
+            if relaxed_pairs:
+                # Determine year/month from target_date
+                target_year = target_date[:4]
+                target_month = target_date[5:7]
+                target_year_int = int(target_year)
+                target_month_int = int(target_month)
+
+                for day_str, price_str in relaxed_pairs:
+                    day_int = int(day_str)
+                    if 1 <= day_int <= 31:
+                        try:
+                            price = int(price_str)
+                            if 50 < price < 50000:
+                                day = day_str.zfill(2)
+                                # Assume same month as target, or next month if day > 28 and target is end of month
+                                date_key = f"{target_year}-{target_month}-{day}"
+                                date_prices[date_key] = price
+                                # Also add next month variant for small day numbers
+                                if day_int <= 12:
+                                    next_month_dt = datetime(target_year_int, target_month_int, 1) + timedelta(days=32)
+                                    next_month_str = next_month_dt.strftime("%Y-%m")
+                                    date_key2 = f"{next_month_str}-{day}"
+                                    date_prices[date_key2] = price
+                        except (ValueError, IndexError):
+                            continue
+
+        # Build offer for the target date
+        target_price = date_prices.get(target_date)
+        if target_price:
+            offers.append({
+                "price": f"{target_price} CNY",
+                "price_float": float(target_price),
+                "currency": "CNY",
+                "carrier": "Ctrip lowest price",
+                "flight_number": "",
+                "departure_time": "",
+                "arrival_time": "",
+                "duration": "",
+                "stops": -1,
+                "cabin": "economy",
+                "source": "Ctrip(Firecrawl price calendar)",
+            })
+
+        # Add nearby dates for price comparison (±3 days)
+        if target_price:
+            try:
+                target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+                nearby = []
+                for delta in range(-3, 4):
+                    if delta == 0:
+                        continue
+                    nearby_dt = target_dt + timedelta(days=delta)
+                    nearby_date = nearby_dt.strftime("%Y-%m-%d")
+                    nearby_price = date_prices.get(nearby_date)
+                    if nearby_price:
+                        nearby.append({
+                            "date": nearby_date,
+                            "price": nearby_price,
+                            "label": "cheaper" if nearby_price < target_price else "more expensive" if nearby_price > target_price else "same",
+                        })
+                # Sort by price and add top 3 cheapest as comparison info
+                if nearby:
+                    nearby.sort(key=lambda x: x["price"])
+                    offers[0]["nearby_dates"] = nearby[:3]
+                    cheaper = [n for n in nearby if n['label'] == 'cheaper']
+                    if cheaper:
+                        offers[0]["price_calendar_note"] = (
+                            f"Price calendar from Ctrip mobile page. "
+                            f"Nearby cheaper dates: " +
+                            ", ".join(f"{n['date']} ¥{n['price']}" for n in cheaper[:3])
+                        )
+                    else:
+                        offers[0]["price_calendar_note"] = (
+                            f"Price calendar from Ctrip mobile page. {target_date} is already among the cheapest nearby dates."
+                        )
+            except (ValueError, IndexError):
+                pass
 
         return offers
 
@@ -1217,7 +1784,27 @@ def search_tickets(departure, arrival, date, ticket_type="all"):
         else:
             output["api_status"]["ctrip_scrape"] = "no_results"
 
-        # Fallback: Try Tequila API (for existing key holders)
+        # Fallback 1: Try Firecrawl (JS rendering, detailed PC flight list first)
+        if not flight_data_found:
+            firecrawl = FirecrawlScraper()
+            if firecrawl.is_configured:
+                print(f"[Firecrawl] 正在通过Firecrawl渲染查询 {origin_iata} → {dest_iata} 的航班详情...", file=sys.stderr)
+                fc_offers = firecrawl.search_flights(departure, arrival, date, is_international)
+                if fc_offers:
+                    output["flight_offers"] = fc_offers
+                    # Distinguish between PC detailed results and mobile price calendar
+                    source = fc_offers[0].get("source", "")
+                    if "PC" in source:
+                        output["api_status"]["firecrawl_pc"] = "ok"
+                    else:
+                        output["api_status"]["firecrawl_mobile"] = "ok"
+                    flight_data_found = True
+                else:
+                    output["api_status"]["firecrawl"] = "no_results"
+            else:
+                output["api_status"]["firecrawl"] = "not_configured"
+
+        # Fallback 2: Try Tequila API (for existing key holders)
         if not flight_data_found:
             tequila = TequilaClient()
             if tequila.is_configured:
@@ -1232,7 +1819,7 @@ def search_tickets(departure, arrival, date, ticket_type="all"):
             else:
                 output["api_status"]["tequila"] = "not_configured"
 
-        # Fallback 2: Try Amadeus API (for existing key holders)
+        # Fallback 3: Try Amadeus API (for existing key holders)
         if not flight_data_found:
             amadeus = AmadeusClient()
             if amadeus.is_configured:
@@ -1355,6 +1942,47 @@ def format_output(data):
                 dur = offer.get("duration", "")
                 price = offer["price"]
                 lines.append(f"| {i} | {carrier} | {fn} | {dep_time} | {arr_time} | {dur} | {price} |")
+            lines.append(f"")
+
+        elif source_name.startswith("Ctrip(Firecrawl-PC)"):
+            # Firecrawl PC detailed flight list format
+            lines.append(f"| 序号 | 航空公司 | 航班号 | 机型 | 出发时间 | 到达时间 | 舱位 | 中转 | 价格 |")
+            lines.append(f"|------|----------|--------|------|----------|----------|------|------|------|")
+            for i, offer in enumerate(data["flight_offers"], 1):
+                carrier = offer.get("carrier", "")
+                fn = offer.get("flight_number", "")
+                aircraft = offer.get("aircraft", "")
+                dep_time = offer.get("departure_time", "")
+                arr_time = offer.get("arrival_time", "")
+                cabin = offer.get("cabin", "")
+                stops = "直飞" if offer.get("stops", 0) == 0 else f"{offer['stops']}次中转"
+                price = offer["price"]
+                lines.append(f"| {i} | {carrier} | {fn} | {aircraft} | {dep_time} | {arr_time} | {cabin} | {stops} | {price} |")
+            lines.append(f"")
+            lines.append(f"> 数据来源: 携程PC网页 (Firecrawl渲染)，包含航班号、起降时间、机型等详细信息")
+            lines.append(f"")
+
+        elif source_name.startswith("Ctrip(Firecrawl"):
+            # Firecrawl mobile price calendar format (less detailed)
+            lines.append(f"| 序号 | 描述 | 价格 |")
+            lines.append(f"|------|------|------|")
+            for i, offer in enumerate(data["flight_offers"], 1):
+                carrier = offer.get("carrier", "")
+                price = offer["price"]
+                note = offer.get("price_calendar_note", "")
+                lines.append(f"| {i} | {carrier} | {price} |")
+                if note:
+                    lines.append(f"| | {note} | |")
+            if data["flight_offers"] and data["flight_offers"][0].get("nearby_dates"):
+                lines.append(f"")
+                lines.append(f"### 附近日期低价")
+                lines.append(f"")
+                lines.append(f"| 日期 | 价格 | 对比 |")
+                lines.append(f"|------|------|------|")
+                for nd in data["flight_offers"][0]["nearby_dates"]:
+                    lines.append(f"| {nd['date']} | ¥{nd['price']} | {nd['label']} |")
+            lines.append(f"")
+            lines.append(f"> 数据来源: 携程移动端价格日历 (Firecrawl渲染)，仅显示每日最低价")
             lines.append(f"")
 
         elif source_name == "Kiwi Tequila":

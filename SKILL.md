@@ -1,23 +1,31 @@
 ---
 name: ticket-price-compare
-description: This skill should be used when the user wants to compare and search for flight or train ticket prices across multiple platforms. It supports both domestic (China) and international routes, fetches real-time train availability via 12306, generates direct search links for all major booking platforms and airline official websites, provides WeChat mini program quick links for mobile search, and highlights discount conditions. For flight prices, it attempts web scraping first (no API key needed), then falls back to Tequila/Amadeus API for existing key holders. Trigger scenarios include: searching for cheap flights, comparing train ticket prices, finding international flight deals, looking for the best ticket booking platform, or asking about ticket discount conditions.
+description: This skill should be used when the user wants to compare and search for flight or train ticket prices across multiple platforms. It supports both domestic (China) and international routes, fetches real-time train availability via 12306, uses Firecrawl to render Ctrip JS pages for detailed flight data (flight numbers, times, aircraft types, prices), generates direct search links for all major booking platforms and airline official websites, provides WeChat mini program quick links for mobile search, and highlights discount conditions. Trigger scenarios include: searching for cheap flights, comparing train ticket prices, finding international flight deals, looking for the best ticket booking platform, or asking about ticket discount conditions.
 ---
 
 # Ticket Price Compare - Multi-Platform Ticket Price Comparison
 
 ## Overview
 
-This skill enables real-time comparison of flight and train ticket prices. It fetches **real-time train availability** via 12306 (no API key needed), and attempts to scrape **flight prices from Ctrip** (no API key needed). It also generates direct search links for all major booking platforms and **WeChat mini program quick links** for convenient mobile search. Tequila/Amadeus APIs are available as optional fallbacks for users who already have keys. Discount conditions and restrictions are clearly listed separately.
+This skill enables real-time comparison of flight and train ticket prices. It fetches **real-time train availability** via 12306 (no API key needed), and uses **Firecrawl to render Ctrip JS pages** for detailed flight data when `FIRECRAWL_API_KEY` is set. It also generates direct search links for all major booking platforms and **WeChat mini program quick links** for convenient mobile search. Tequila/Amadeus APIs are available as optional fallbacks for users who already have keys. Discount conditions and restrictions are clearly listed separately.
 
 ## Data Sources
 
-### Ctrip Web Scraping (Primary, No API Key Needed)
-- Scrapes public Ctrip flight search pages for price data
+### Firecrawl + Ctrip (Primary for Flight Data, Optional API Key)
+- Uses Firecrawl's `/v2/scrape` API to render Ctrip's JavaScript-heavy flight search pages
+- **PC page** (primary): Returns individual flight numbers, times, aircraft types, and prices
+- **Mobile H5 page** (fallback): Returns price calendar with daily lowest prices across dates
+- Requires `FIRECRAWL_API_KEY` environment variable. Register at [firecrawl.dev](https://firecrawl.dev)
+- Falls back gracefully to direct scraping if not configured
+
+### Ctrip Direct Scraping (No API Key Needed)
+- Attempts direct HTTP request to Ctrip flight search pages
 - **No registration or API key required** - works out of the box
-- Note: Ctrip renders pages via JavaScript, so scraping may not always return prices. In that case, platform links are provided for manual search.
+- Limited data: Ctrip renders pages via JavaScript, so direct scraping may not always return prices. In that case, platform links are provided for manual search.
 
 ### 12306 (Train Tickets, No API Key Needed)
-- Uses 12306 public endpoint for real-time train availability
+- Uses 12306 public `leftTicket/queryZ` endpoint for real-time train availability
+- Uses 12306 public `queryTicketPrice` endpoint for actual fares per seat type
 - Supports major Chinese cities with station code auto-mapping
 
 ### Optional APIs (For Existing Key Holders Only)
@@ -36,9 +44,11 @@ python scripts/ticket_search.py "<departure>" "<arrival>" "<date>" flight
 - International: `python scripts/ticket_search.py "Shanghai" "Tokyo" "2026-06-15" flight`
 
 **Data sources (in order of priority)**:
-1. Ctrip Web Scraping (no API key, may return prices or flight info)
-2. Tequila API (if API key configured)
-3. Amadeus API (if API keys configured)
+1. Firecrawl + Ctrip PC page (if `FIRECRAWL_API_KEY` set) - Best quality: individual flights, times, aircraft, prices
+2. Firecrawl + Ctrip Mobile H5 (fallback) - Price calendar with daily lowest prices
+3. Ctrip Direct Scraping (no API key, limited data)
+4. Tequila API (if API key configured)
+5. Amadeus API (if API keys configured)
 
 **Covered domestic platforms**: Ctrip, Qunar, Fliggy, Tongcheng, Tuniu
 
@@ -57,6 +67,7 @@ python scripts/ticket_search.py "<departure>" "<arrival>" "<date>" train
 - Departure/arrival stations & times
 - Duration
 - Available seat types & counts (Business Class/First Class/Second Class/Hard Sleeper/Hard Seat etc.)
+- Actual fares per seat type
 
 ### 3. Combined Search (Flight + Train)
 
@@ -71,11 +82,11 @@ Train results are automatically excluded for international routes.
 The script generates structured output with these sections (in order):
 
 1. **Route Summary** - Departure, arrival, date, route type
-2. **Data Source Status** - Whether scraping/APIs returned live data
+2. **Data Source Status** - Whether Firecrawl/scraping/APIs returned live data
 3. **Real-Time Flight Prices** - Table of flight offers with prices (if available)
 4. **Transfer Details** - Multi-segment flight details (if any transfers)
 5. **Flight Discount Conditions** - Refund/change rules, baggage limits, cabin restrictions
-6. **Real-Time Train Info** - Table of actual trains with seat availability (if domestic)
+6. **Real-Time Train Info** - Table of actual trains with seat availability and fares (if domestic)
 7. **Train Discount Conditions** - Student tickets, child tickets, change rules
 8. **Platform Links** - Direct search URLs for all booking platforms
 9. **Airline Official Sites** - Direct links to airline websites
@@ -96,7 +107,7 @@ Always include the dedicated "Discount Conditions / Restrictions" section. Refer
 2. **Execute search**: Run `scripts/ticket_search.py` with the parameters.
 
 3. **Present results**: Show the complete output including:
-   - Real-time prices (if available from scraping or API)
+   - Real-time prices (if available from Firecrawl, scraping, or API)
    - All platform links for comparison
    - Discount conditions section
    - Search tips
@@ -112,11 +123,13 @@ If a user asks for "cheapest dates" or "price trends":
 
 ## Important Notes
 
-- **Primary method**: Web scraping (Ctrip) - no API key needed, but may not always work due to JavaScript rendering
+- **Primary method**: Firecrawl + Ctrip (if API key set) - renders JS pages, gets detailed flight data
+- **Fallback scraping**: Direct Ctrip HTTP request - no API key needed, but limited data due to JS rendering
 - **Fallback APIs**: Tequila/Amadeus - only for users who already have keys; registration is closed for new users
 - **Without any flight data**: Platform search links are always provided (users click to see prices)
 - **12306 train data** is always real-time (no API key needed)
 - **SSL verification**: Only disabled for 12306 endpoints (known certificate chain issues); all other connections use full TLS verification
+- **Firecrawl proxy**: Uses `proxy: "basic"` for optimal reliability with Chinese booking sites
 - Prices vary in real-time; recommend checking 2-3 platforms for confirmation
 - Airline official websites sometimes offer exclusive prices not available on OTA platforms
 - Always remind users about potential discount conditions before booking
