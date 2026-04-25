@@ -59,43 +59,31 @@ try:
 except ImportError:
     HAS_AMADEUS_SDK = False
 
-# SSL context for 12306: full verification by default.
-# 12306.cn has known certificate chain issues on some networks/systems.
-# Previously we auto-fell back to unverified SSL — this was flagged as a security risk
-# (MITM exposure). Now the fallback is OPT-IN only: set TICKET_ALLOW_UNVERIFIED_SSL=true
-# to enable it. Without this env var, SSL cert errors will raise an exception with
-# a helpful message instead of silently bypassing verification.
-_ssl_ctx_verified = ssl.create_default_context()  # Full TLS verification
-
-_ALLOW_UNVERIFIED_SSL = os.environ.get("TICKET_ALLOW_UNVERIFIED_SSL", "").lower() == "true"
-
-if _ALLOW_UNVERIFIED_SSL:
-    _ssl_ctx_unverified = ssl.create_default_context()
-    _ssl_ctx_unverified.check_hostname = False
-    _ssl_ctx_unverified.verify_mode = ssl.CERT_NONE
+# SSL context for 12306: full verification always.
+# 12306.cn may have certificate chain issues on some networks/systems,
+# but we never bypass SSL verification — doing so exposes connections to
+# MITM attacks. If SSL verification fails, the script returns an empty
+# result with a helpful message. 12306 queries are public data (no
+# credentials transmitted), so the impact is limited to unavailable
+# train data; all other features (flight search, platform links) still work.
+_ssl_ctx = ssl.create_default_context()  # Full TLS verification
 
 
 def _urlopen_12306(req, timeout=15):
     """Open a URL to 12306 with full SSL verification.
 
-    If SSL certificate verification fails:
-    - When TICKET_ALLOW_UNVERIFIED_SSL=true: falls back to unverified connection (MITM risk!)
-    - Otherwise: raises the SSL error with a helpful message suggesting the env var.
-    All non-SSL errors (network, timeout, HTTP) propagate normally.
+    If SSL verification fails, raises the error with a helpful message.
+    The caller should catch the exception and return empty results gracefully.
     """
     try:
-        return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_verified)
+        return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx)
     except (ssl.SSLError, urllib.error.URLError) as e:
         is_ssl_error = isinstance(e, ssl.SSLError) or "CERTIFICATE" in str(e).upper() or "SSL" in str(e).upper()
         if is_ssl_error:
-            if _ALLOW_UNVERIFIED_SSL:
-                print(f"[12306] SSL verification failed, falling back to unverified (MITM risk): {e}", file=sys.stderr)
-                return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_unverified)
-            else:
-                print(f"[12306] SSL verification failed: {e}", file=sys.stderr)
-                print("[12306] Set environment variable TICKET_ALLOW_UNVERIFIED_SSL=true to allow "
-                      "unverified fallback (not recommended on untrusted networks).", file=sys.stderr)
-                raise
+            print(f"[12306] SSL certificate verification failed: {e}", file=sys.stderr)
+            print("[12306] Train data unavailable due to SSL error. "
+                  "Try updating system CA certificates or using a different network. "
+                  "Other features (flight search, platform links) still work.", file=sys.stderr)
         raise
 
 

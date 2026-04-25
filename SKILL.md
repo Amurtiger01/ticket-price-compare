@@ -1,6 +1,6 @@
 ---
 name: ticket-price-compare
-version: 1.2.5
+version: 1.2.6
 description: This skill should be used when the user wants to compare and search for flight or train ticket prices across multiple platforms. It supports both domestic (China) and international routes, fetches real-time train availability via 12306, uses Firecrawl to render Ctrip JS pages for detailed flight data (flight numbers, times, aircraft types, prices), generates direct search links for all major booking platforms and airline official websites, provides WeChat mini program quick links for mobile search, and highlights discount conditions. Trigger scenarios include: searching for cheap flights, comparing train ticket prices, finding international flight deals, looking for the best ticket booking platform, or asking about ticket discount conditions.
 environment_variables:
   - name: FIRECRAWL_API_KEY
@@ -15,9 +15,6 @@ environment_variables:
   - name: AMADEUS_CLIENT_SECRET
     required: false
     description: "Amadeus API client secret. Self-service registration is closed."
-  - name: TICKET_ALLOW_UNVERIFIED_SSL
-    required: false
-    description: "Set to 'true' to allow fallback to unverified SSL for 12306.cn when certificate verification fails. Default: disabled (SSL errors raise exceptions instead of silently bypassing). Only enable on trusted networks."
 network_access:
   - domain: kyfw.12306.cn
     purpose: "12306 train schedule & fare queries (public API, no auth)"
@@ -165,7 +162,7 @@ If a user asks for "cheapest dates" or "price trends":
 - **Fallback APIs**: Tequila/Amadeus - only for users who already have keys; registration is closed for new users
 - **Without any flight data**: Platform search links are always provided (users click to see prices)
 - **12306 train data** is always real-time (no API key needed)
-- **SSL verification**: 12306 endpoints use full TLS verification by default. If certificate verification fails, the script raises an error rather than silently bypassing. To opt in to the unverified SSL fallback (reduces MITM protection), set `TICKET_ALLOW_UNVERIFIED_SSL=true` environment variable — only recommended on trusted networks. All other connections always use full TLS verification.
+- **SSL verification**: All connections use full TLS verification. 12306 endpoints never bypass SSL — if certificate verification fails, train data is unavailable for that request but all other features (flight search, platform links) still work.
 - **Firecrawl proxy**: Uses `proxy: "basic"` for optimal reliability with Chinese booking sites
 - Prices vary in real-time; recommend checking 2-3 platforms for confirmation
 - Airline official websites sometimes offer exclusive prices not available on OTA platforms
