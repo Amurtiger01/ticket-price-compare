@@ -1,6 +1,40 @@
 ---
 name: ticket-price-compare
+version: 1.2.5
 description: This skill should be used when the user wants to compare and search for flight or train ticket prices across multiple platforms. It supports both domestic (China) and international routes, fetches real-time train availability via 12306, uses Firecrawl to render Ctrip JS pages for detailed flight data (flight numbers, times, aircraft types, prices), generates direct search links for all major booking platforms and airline official websites, provides WeChat mini program quick links for mobile search, and highlights discount conditions. Trigger scenarios include: searching for cheap flights, comparing train ticket prices, finding international flight deals, looking for the best ticket booking platform, or asking about ticket discount conditions.
+environment_variables:
+  - name: FIRECRAWL_API_KEY
+    required: false
+    description: "Firecrawl API key for JS rendering of Ctrip flight pages. Register at firecrawl.dev. Free tier available (500 credits/month)."
+  - name: TEQUILA_API_KEY
+    required: false
+    description: "Kiwi.com Tequila API key for international flight data. Self-service registration is closed."
+  - name: AMADEUS_CLIENT_ID
+    required: false
+    description: "Amadeus API client ID. Self-service registration is closed."
+  - name: AMADEUS_CLIENT_SECRET
+    required: false
+    description: "Amadeus API client secret. Self-service registration is closed."
+  - name: TICKET_ALLOW_UNVERIFIED_SSL
+    required: false
+    description: "Set to 'true' to allow fallback to unverified SSL for 12306.cn when certificate verification fails. Default: disabled (SSL errors raise exceptions instead of silently bypassing). Only enable on trusted networks."
+network_access:
+  - domain: kyfw.12306.cn
+    purpose: "12306 train schedule & fare queries (public API, no auth)"
+  - domain: flights.ctrip.com
+    purpose: "Ctrip PC flight search page (scraping / Firecrawl JS rendering)"
+  - domain: m.ctrip.com
+    purpose: "Ctrip mobile H5 flight page (Firecrawl fallback for price calendar)"
+  - domain: flight.qunar.com
+    purpose: "Qunar flight search page (link generation)"
+  - domain: api.firecrawl.dev
+    purpose: "Firecrawl /v2/scrape API for JS rendering (optional, requires FIRECRAWL_API_KEY)"
+  - domain: api.tequila.kiwi.com
+    purpose: "Kiwi.com Tequila flight search API (optional, requires TEQUILA_API_KEY)"
+  - domain: api.amadeus.com
+    purpose: "Amadeus production API (optional, requires AMADEUS credentials)"
+  - domain: test.api.amadeus.com
+    purpose: "Amadeus test API (optional, for development)"
 ---
 
 # Ticket Price Compare - Multi-Platform Ticket Price Comparison
@@ -131,7 +165,7 @@ If a user asks for "cheapest dates" or "price trends":
 - **Fallback APIs**: Tequila/Amadeus - only for users who already have keys; registration is closed for new users
 - **Without any flight data**: Platform search links are always provided (users click to see prices)
 - **12306 train data** is always real-time (no API key needed)
-- **SSL verification**: 12306 endpoints use a "verify first, fallback on error" strategy — full TLS verification is attempted first; only if SSL certificate errors occur does it fall back to unverified mode. All other connections use full TLS verification at all times.
+- **SSL verification**: 12306 endpoints use full TLS verification by default. If certificate verification fails, the script raises an error rather than silently bypassing. To opt in to the unverified SSL fallback (reduces MITM protection), set `TICKET_ALLOW_UNVERIFIED_SSL=true` environment variable — only recommended on trusted networks. All other connections always use full TLS verification.
 - **Firecrawl proxy**: Uses `proxy: "basic"` for optimal reliability with Chinese booking sites
 - Prices vary in real-time; recommend checking 2-3 platforms for confirmation
 - Airline official websites sometimes offer exclusive prices not available on OTA platforms

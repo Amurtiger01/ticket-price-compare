@@ -1,6 +1,6 @@
 # Ticket Price Compare - Multi-Platform Ticket Price Comparison
 
-[![Version](https://img.shields.io/badge/Version-v1.2.0-blue)]()
+[![Version](https://img.shields.io/badge/Version-v1.2.5-blue)]()
 [![Skill Type](https://img.shields.io/badge/Type-AI%20Skill-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.8%2B-green)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)]()
@@ -192,6 +192,7 @@ $env:AMADEUS_CLIENT_SECRET = "your-client-secret"
 | `TEQUILA_API_KEY` | Kiwi.com (closed) | String | No |
 | `AMADEUS_CLIENT_ID` | Amadeus (closed) | String | No |
 | `AMADEUS_CLIENT_SECRET` | Amadeus (closed) | String | No |
+| `TICKET_ALLOW_UNVERIFIED_SSL` | N/A (user opt-in) | `true` | No |
 
 > **Note**: Environment variables set via `export`/`set`/`$env:` are session-only and will be lost when you close the terminal. Use `setx` (Windows) or add to `~/.bashrc` (Linux/macOS) for persistence.
 
@@ -277,7 +278,7 @@ ticket-price-compare/
 - **Dual-Source Ctrip** - PC page (`flights.ctrip.com`) for per-flight details; mobile H5 (`m.ctrip.com`) for price calendar fallback
 - **12306 Endpoints** - Uses `leftTicket/queryZ` for schedules + `queryTicketPrice` for actual fares, no login required
 - **City Name Mapping** - Built-in 200+ Chinese city/station name to IATA/telegraph code mapping
-- **SSL Security** - 12306 endpoints use a "verify first, fallback on error" strategy: full TLS verification is attempted first; only if SSL certificate errors occur does it fall back to unverified mode. All other connections always use full TLS verification.
+- **SSL Security** - 12306 endpoints use full TLS verification by default. If certificate verification fails, the error is raised (no silent bypass). To allow unverified SSL fallback for 12306, set `TICKET_ALLOW_UNVERIFIED_SSL=true` (opt-in, not recommended on untrusted networks). All other connections always use full TLS verification.
 - **Encoding Compatibility** - Auto-handles Windows console UTF-8 encoding issues
 
 ## Flight Data Source Priority

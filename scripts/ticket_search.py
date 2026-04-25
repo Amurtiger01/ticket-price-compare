@@ -59,30 +59,43 @@ try:
 except ImportError:
     HAS_AMADEUS_SDK = False
 
-# SSL context for 12306: try with verification first, fall back to unverified.
-# 12306.cn has known certificate chain issues on some networks/systems,
-# but we should NOT blindly disable SSL verification. Instead, we use a
-# "verify first, fallback on error" approach to minimize MITM risk.
+# SSL context for 12306: full verification by default.
+# 12306.cn has known certificate chain issues on some networks/systems.
+# Previously we auto-fell back to unverified SSL — this was flagged as a security risk
+# (MITM exposure). Now the fallback is OPT-IN only: set TICKET_ALLOW_UNVERIFIED_SSL=true
+# to enable it. Without this env var, SSL cert errors will raise an exception with
+# a helpful message instead of silently bypassing verification.
 _ssl_ctx_verified = ssl.create_default_context()  # Full TLS verification
-_ssl_ctx_unverified = ssl.create_default_context()
-_ssl_ctx_unverified.check_hostname = False
-_ssl_ctx_unverified.verify_mode = ssl.CERT_NONE
+
+_ALLOW_UNVERIFIED_SSL = os.environ.get("TICKET_ALLOW_UNVERIFIED_SSL", "").lower() == "true"
+
+if _ALLOW_UNVERIFIED_SSL:
+    _ssl_ctx_unverified = ssl.create_default_context()
+    _ssl_ctx_unverified.check_hostname = False
+    _ssl_ctx_unverified.verify_mode = ssl.CERT_NONE
 
 
 def _urlopen_12306(req, timeout=15):
-    """Open a URL to 12306 with SSL verification, falling back to unverified on cert errors.
+    """Open a URL to 12306 with full SSL verification.
 
-    This limits the MITM exposure window: only if the verified connection
-    fails due to certificate issues do we retry without verification.
-    All other errors (network, timeout, HTTP) propagate normally.
+    If SSL certificate verification fails:
+    - When TICKET_ALLOW_UNVERIFIED_SSL=true: falls back to unverified connection (MITM risk!)
+    - Otherwise: raises the SSL error with a helpful message suggesting the env var.
+    All non-SSL errors (network, timeout, HTTP) propagate normally.
     """
     try:
         return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_verified)
     except (ssl.SSLError, urllib.error.URLError) as e:
-        # Only fallback on SSL certificate errors, not other network errors
-        if isinstance(e, ssl.SSLError) or "CERTIFICATE" in str(e).upper() or "SSL" in str(e).upper():
-            print(f"[12306] SSL verification failed, falling back to unverified: {e}", file=sys.stderr)
-            return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_unverified)
+        is_ssl_error = isinstance(e, ssl.SSLError) or "CERTIFICATE" in str(e).upper() or "SSL" in str(e).upper()
+        if is_ssl_error:
+            if _ALLOW_UNVERIFIED_SSL:
+                print(f"[12306] SSL verification failed, falling back to unverified (MITM risk): {e}", file=sys.stderr)
+                return urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx_unverified)
+            else:
+                print(f"[12306] SSL verification failed: {e}", file=sys.stderr)
+                print("[12306] Set environment variable TICKET_ALLOW_UNVERIFIED_SSL=true to allow "
+                      "unverified fallback (not recommended on untrusted networks).", file=sys.stderr)
+                raise
         raise
 
 
